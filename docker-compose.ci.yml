@@ -1,0 +1,10 @@
+# Used by CI: runs the API with the offline fake LLM and hashing embeddings,
+# so the smoke test does not download model weights.
+services:
+  api:
+    environment:
+      AGRO_LLM_PROVIDER: fake
+      AGRO_EMBEDDING_PROVIDER: hashing
+    depends_on: !override
+      migrate:
+        condition: service_completed_successfully
