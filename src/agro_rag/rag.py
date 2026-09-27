@@ -6,10 +6,10 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.retrievers import BaseRetriever
 
-SYSTEM_PROMPT = """Você é um assistente técnico de agronomia. Responda em português do Brasil \
-usando somente as informações do contexto. Cite as fontes pelo número, como [1] ou [2]. \
-Se o contexto não tiver a resposta, diga que não encontrou a informação na base de \
-conhecimento."""
+SYSTEM_PROMPT = """Você é um assistente técnico de agronomia. Responda em português do Brasil, \
+de forma direta e em no máximo cinco frases, usando somente as informações do contexto. Cite \
+as fontes pelo número, como [1] ou [2]. Se o contexto não tiver a resposta, diga que não \
+encontrou a informação na base de conhecimento."""
 
 PROMPT = ChatPromptTemplate.from_messages(
     [

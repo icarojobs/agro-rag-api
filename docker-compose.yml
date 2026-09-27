@@ -2,7 +2,7 @@ x-app-env: &app-env
   AGRO_ENVIRONMENT: docker
   AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
   AGRO_OLLAMA_BASE_URL: http://ollama:11434
-  AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
+  AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
 
 services:
   db:
@@ -36,7 +36,7 @@ services:
 
   ollama-pull:
     image: ollama/ollama:0.19.0
-    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen2.5:1.5b}"]
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen2.5:3b}"]
     environment:
       OLLAMA_HOST: ollama:11434
     depends_on:

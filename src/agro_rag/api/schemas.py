@@ -46,3 +46,10 @@ class AskResponse(BaseModel):
     sources: list[Source]
     model: str
     took_ms: float
+
+
+class AgentResponse(BaseModel):
+    answer: str
+    sources: list[Source]
+    steps: list[str]
+    took_ms: float
