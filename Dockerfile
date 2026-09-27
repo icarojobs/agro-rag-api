@@ -20,6 +20,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 FROM builder AS dev
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen
+COPY alembic.ini ./
 COPY tests ./tests
 ENV PATH="/app/.venv/bin:$PATH"
 CMD ["pytest"]
@@ -31,6 +32,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN useradd --create-home --uid 1000 app
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
+COPY --chown=app:app alembic.ini ./
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "agro_rag.main:app", "--host", "0.0.0.0", "--port", "8000"]

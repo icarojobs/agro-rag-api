@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     environment: str = "local"
     log_level: str = "INFO"
 
+    database_url: str = "postgresql+asyncpg://agro:agro@localhost:5433/agro"
+    db_pool_size: int = 10
+    db_max_overflow: int = 10
+
 
 @lru_cache
 def get_settings() -> Settings:
