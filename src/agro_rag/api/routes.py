@@ -3,8 +3,10 @@ import time
 from fastapi import APIRouter, Response, status
 
 from agro_rag import __version__
+from agro_rag.agent import build_agent
 from agro_rag.api.deps import EmbeddingsDep, LLMDep, SessionDep, SettingsDep
 from agro_rag.api.schemas import (
+    AgentResponse,
     AskRequest,
     AskResponse,
     HealthResponse,
@@ -73,5 +75,30 @@ async def ask(
             for d in result.documents
         ],
         model=getattr(llm, "model", llm._llm_type),
+        took_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@router.post("/agent", response_model=AgentResponse, tags=["generation"])
+async def agent(
+    body: AskRequest, embeddings: EmbeddingsDep, llm: LLMDep, settings: SettingsDep
+) -> AgentResponse:
+    started = time.perf_counter()
+    retriever = PgVectorRetriever(
+        sessionmaker=get_sessionmaker(),
+        embeddings=embeddings,
+        collection=settings.collection,
+        k=body.k,
+    )
+    state = await build_agent(retriever, llm).ainvoke({"question": body.question})
+    return AgentResponse(
+        answer=state["answer"],
+        sources=[
+            Source(
+                source=d.metadata["source"], title=d.metadata["title"], score=d.metadata["score"]
+            )
+            for d in state["documents"]
+        ],
+        steps=state["steps"],
         took_ms=round((time.perf_counter() - started) * 1000, 2),
     )
