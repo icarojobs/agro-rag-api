@@ -1,13 +1,47 @@
+x-app-env: &app-env
+  AGRO_ENVIRONMENT: docker
+  AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
+
 services:
-  api:
+  db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_USER: agro
+      POSTGRES_PASSWORD: agro
+      POSTGRES_DB: agro
+    ports:
+      - "5433:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-test-db.sql:/docker-entrypoint-initdb.d/10-test-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agro -d agro"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  migrate:
+    image: agro-rag-api:latest
     build:
       context: .
       target: runtime
+    command: ["alembic", "upgrade", "head"]
+    environment: *app-env
+    depends_on:
+      db:
+        condition: service_healthy
+
+  api:
     image: agro-rag-api:latest
+    build:
+      context: .
+      target: runtime
     ports:
       - "8000:8000"
-    environment:
-      AGRO_ENVIRONMENT: docker
+    environment: *app-env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -15,8 +49,16 @@ services:
       retries: 5
 
   tests:
+    image: agro-rag-api:dev
     build:
       context: .
       target: dev
-    image: agro-rag-api:dev
     profiles: ["test"]
+    environment:
+      AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro_test
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
