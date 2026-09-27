@@ -28,11 +28,13 @@ CMD ["pytest"]
 FROM python:3.12-slim-bookworm AS runtime
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PATH="/app/.venv/bin:$PATH"
-RUN useradd --create-home --uid 1000 app
+    PATH="/app/.venv/bin:$PATH" \
+    HF_HOME=/models
+RUN useradd --create-home --uid 1000 app && mkdir /models && chown app:app /models
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app alembic.ini ./
+COPY --chown=app:app corpus ./corpus
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "agro_rag.main:app", "--host", "0.0.0.0", "--port", "8000"]

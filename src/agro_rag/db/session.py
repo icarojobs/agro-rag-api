@@ -12,8 +12,7 @@ from sqlalchemy.ext.asyncio import (
 from agro_rag.config import get_settings
 
 
-@lru_cache
-def get_engine() -> AsyncEngine:
+def create_engine() -> AsyncEngine:
     settings = get_settings()
     return create_async_engine(
         settings.database_url,
@@ -21,6 +20,11 @@ def get_engine() -> AsyncEngine:
         max_overflow=settings.db_max_overflow,
         pool_pre_ping=True,
     )
+
+
+@lru_cache
+def get_engine() -> AsyncEngine:
+    return create_engine()
 
 
 @lru_cache
