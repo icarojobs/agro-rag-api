@@ -1,4 +1,6 @@
 from functools import lru_cache
+from pathlib import Path
+from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -13,6 +15,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://agro:agro@localhost:5433/agro"
     db_pool_size: int = 10
     db_max_overflow: int = 10
+
+    embedding_provider: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
+    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+
+    corpus_dir: Path = Path("corpus")
+    collection: str = "default"
+    chunk_size: int = 500
+    chunk_overlap: int = 80
 
 
 @lru_cache

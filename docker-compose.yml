@@ -39,6 +39,8 @@ services:
     ports:
       - "8000:8000"
     environment: *app-env
+    volumes:
+      - hf-cache:/models
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -62,3 +64,4 @@ services:
 
 volumes:
   pgdata:
+  hf-cache:

@@ -1,9 +1,11 @@
 import os
 from collections.abc import AsyncIterator, Iterator
+from pathlib import Path
 
 os.environ.setdefault(
     "AGRO_DATABASE_URL", "postgresql+asyncpg://agro:agro@localhost:5433/agro_test"
 )
+os.environ.setdefault("AGRO_EMBEDDING_PROVIDER", "hashing")
 
 import pytest
 from alembic import command
@@ -12,7 +14,9 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agro_rag.config import get_settings
 from agro_rag.db.session import get_engine, get_sessionmaker
+from agro_rag.embeddings import get_embeddings
 from agro_rag.main import create_app
 
 
@@ -22,6 +26,13 @@ def migrated_database() -> Iterator[None]:
     config.attributes["configure_logger"] = False
     command.upgrade(config, "head")
     yield
+
+
+@pytest.fixture(autouse=True)
+def reset_cached_settings() -> Iterator[None]:
+    yield
+    get_settings.cache_clear()
+    get_embeddings.cache_clear()
 
 
 @pytest.fixture
@@ -43,3 +54,19 @@ async def client() -> AsyncIterator[AsyncClient]:
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+def corpus_dir(tmp_path: Path) -> Path:
+    (tmp_path / "solo").mkdir()
+    (tmp_path / "pragas").mkdir()
+    (tmp_path / "solo" / "calagem.md").write_text(
+        "# Calagem\n\nO calcário corrige a acidez do solo e fornece cálcio e magnésio.\n\n"
+        "A dose é calculada pelo método da saturação por bases.",
+        encoding="utf-8",
+    )
+    (tmp_path / "pragas" / "percevejo.md").write_text(
+        "# Percevejo-marrom\n\nO percevejo suga os grãos de soja entre R3 e R6.",
+        encoding="utf-8",
+    )
+    return tmp_path

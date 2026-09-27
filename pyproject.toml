@@ -15,6 +15,11 @@ dependencies = [
     "asyncpg>=0.30",
     "pgvector>=0.3.6",
     "alembic>=1.14",
+    "torch>=2.5",
+    "sentence-transformers>=5.0",
+    "langchain-core>=1.0",
+    "langchain-text-splitters>=1.0",
+    "typer>=0.15",
 ]
 
 [dependency-groups]
@@ -26,6 +31,17 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
 ]
+
+[project.scripts]
+agro-rag = "agro_rag.cli:app"
+
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]
