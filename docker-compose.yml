@@ -1,6 +1,8 @@
 x-app-env: &app-env
   AGRO_ENVIRONMENT: docker
   AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
+  AGRO_OLLAMA_BASE_URL: http://ollama:11434
+  AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:1.5b}
 
 services:
   db:
@@ -19,6 +21,27 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  ollama:
+    image: ollama/ollama:0.19.0
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ollama-pull:
+    image: ollama/ollama:0.19.0
+    entrypoint: ["ollama", "pull", "${OLLAMA_MODEL:-qwen2.5:1.5b}"]
+    environment:
+      OLLAMA_HOST: ollama:11434
+    depends_on:
+      ollama:
+        condition: service_healthy
 
   migrate:
     image: agro-rag-api:latest
@@ -44,6 +67,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      ollama-pull:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
       interval: 10s
@@ -58,6 +83,8 @@ services:
     profiles: ["test"]
     environment:
       AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro_test
+      AGRO_EMBEDDING_PROVIDER: hashing
+      AGRO_LLM_PROVIDER: fake
     depends_on:
       db:
         condition: service_healthy
@@ -65,3 +92,4 @@ services:
 volumes:
   pgdata:
   hf-cache:
+  ollama:

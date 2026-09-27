@@ -3,10 +3,19 @@ import time
 from fastapi import APIRouter, Response, status
 
 from agro_rag import __version__
-from agro_rag.api.deps import EmbeddingsDep, SessionDep, SettingsDep
-from agro_rag.api.schemas import HealthResponse, SearchHit, SearchRequest, SearchResponse
-from agro_rag.db.session import ping
-from agro_rag.retrieval import search
+from agro_rag.api.deps import EmbeddingsDep, LLMDep, SessionDep, SettingsDep
+from agro_rag.api.schemas import (
+    AskRequest,
+    AskResponse,
+    HealthResponse,
+    SearchHit,
+    SearchRequest,
+    SearchResponse,
+    Source,
+)
+from agro_rag.db.session import get_sessionmaker, ping
+from agro_rag.rag import RagChain
+from agro_rag.retrieval import PgVectorRetriever, search
 
 router = APIRouter()
 
@@ -39,5 +48,30 @@ async def semantic_search(
     return SearchResponse(
         query=body.query,
         results=[SearchHit.model_validate(c, from_attributes=True) for c in chunks],
+        took_ms=round((time.perf_counter() - started) * 1000, 2),
+    )
+
+
+@router.post("/ask", response_model=AskResponse, tags=["generation"])
+async def ask(
+    body: AskRequest, embeddings: EmbeddingsDep, llm: LLMDep, settings: SettingsDep
+) -> AskResponse:
+    started = time.perf_counter()
+    retriever = PgVectorRetriever(
+        sessionmaker=get_sessionmaker(),
+        embeddings=embeddings,
+        collection=settings.collection,
+        k=body.k,
+    )
+    result = await RagChain(retriever, llm).ainvoke(body.question)
+    return AskResponse(
+        answer=result.answer,
+        sources=[
+            Source(
+                source=d.metadata["source"], title=d.metadata["title"], score=d.metadata["score"]
+            )
+            for d in result.documents
+        ],
+        model=getattr(llm, "model", llm._llm_type),
         took_ms=round((time.perf_counter() - started) * 1000, 2),
     )
