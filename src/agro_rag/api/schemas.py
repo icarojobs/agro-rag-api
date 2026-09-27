@@ -26,3 +26,23 @@ class SearchResponse(BaseModel):
     query: str
     results: list[SearchHit]
     took_ms: float
+
+
+class AskRequest(BaseModel):
+    question: str = Field(
+        min_length=3, max_length=500, examples=["quando aplicar nitrogênio em cobertura no milho?"]
+    )
+    k: int = Field(default=4, ge=1, le=10)
+
+
+class Source(BaseModel):
+    source: str
+    title: str
+    score: float
+
+
+class AskResponse(BaseModel):
+    answer: str
+    sources: list[Source]
+    model: str
+    took_ms: float
