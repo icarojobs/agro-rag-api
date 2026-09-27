@@ -6,6 +6,7 @@ os.environ.setdefault(
     "AGRO_DATABASE_URL", "postgresql+asyncpg://agro:agro@localhost:5433/agro_test"
 )
 os.environ.setdefault("AGRO_EMBEDDING_PROVIDER", "hashing")
+os.environ.setdefault("AGRO_LLM_PROVIDER", "fake")
 
 import pytest
 from alembic import command
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agro_rag.config import get_settings
 from agro_rag.db.session import get_engine, get_sessionmaker
 from agro_rag.embeddings import get_embeddings
+from agro_rag.llm import get_llm
 from agro_rag.main import create_app
 
 
@@ -33,6 +35,7 @@ def reset_cached_settings() -> Iterator[None]:
     yield
     get_settings.cache_clear()
     get_embeddings.cache_clear()
+    get_llm.cache_clear()
 
 
 @pytest.fixture
