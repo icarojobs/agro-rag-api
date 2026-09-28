@@ -54,3 +54,18 @@ def test_cli_ingest(corpus_dir: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "documents=2 created=2" in result.output
+
+
+async def test_changing_chunk_size_reindexes_documents(
+    session: AsyncSession, corpus_dir: Path
+) -> None:
+    embeddings = HashingEmbeddings()
+    first = await ingest_corpus(
+        session, embeddings, corpus_dir, collection="t", chunk_size=60, chunk_overlap=10
+    )
+    second = await ingest_corpus(
+        session, embeddings, corpus_dir, collection="t", chunk_size=400, chunk_overlap=10
+    )
+
+    assert (second.updated, second.skipped) == (2, 0)
+    assert second.chunks < first.chunks

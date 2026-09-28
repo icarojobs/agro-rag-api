@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     db_max_overflow: int = 10
 
     embedding_provider: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
-    embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    embedding_model: str = "intfloat/multilingual-e5-small"
 
     llm_provider: Literal["ollama", "fake"] = "ollama"
     ollama_base_url: str = "http://localhost:11434"

@@ -65,3 +65,25 @@ def test_get_embeddings_uses_configured_provider(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr(emb, "SentenceTransformerEmbeddings", lambda name: ("st", name))
 
     assert emb.get_embeddings() == ("st", get_settings().embedding_model)  # type: ignore[comparison-overlap]
+
+
+def test_e5_models_get_query_and_passage_prefixes(monkeypatch: pytest.MonkeyPatch) -> None:
+    seen: list[str] = []
+
+    class FakeModel:
+        def __init__(self, name: str, device: str) -> None:
+            pass
+
+        def encode(self, texts: list[str], **_: Any) -> np.ndarray:
+            seen.extend(texts)
+            return np.zeros((len(texts), 2))
+
+    import sentence_transformers
+
+    monkeypatch.setattr(sentence_transformers, "SentenceTransformer", FakeModel)
+    model = emb.SentenceTransformerEmbeddings("intfloat/multilingual-e5-small")
+
+    model.embed_query("calagem")
+    model.embed_documents(["texto"])
+
+    assert seen == ["query: calagem", "passage: texto"]
