@@ -43,6 +43,7 @@ dev = [
     "ruff>=0.8",
     "mypy>=1.13",
     "pandas-stubs>=3.0.5.260914",
+    "locust>=2.32",
 ]
 
 [project.scripts]
