@@ -12,6 +12,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from agro_rag.db.models import Chunk, Document
+from agro_rag.observability import RETRIEVAL_SECONDS, tracer
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,8 +75,21 @@ async def search(
     collection: str,
     category: str | None = None,
 ) -> list[RetrievedChunk]:
-    vector = await asyncio.to_thread(embeddings.embed_query, query)
-    return await search_by_vector(session, vector, k=k, collection=collection, category=category)
+    with (
+        RETRIEVAL_SECONDS.time(),
+        tracer.start_as_current_span("retrieval.search") as span,
+    ):
+        span.set_attribute("retrieval.k", k)
+        span.set_attribute("retrieval.collection", collection)
+        with tracer.start_as_current_span("retrieval.embed_query"):
+            vector = await asyncio.to_thread(embeddings.embed_query, query)
+        results = await search_by_vector(
+            session, vector, k=k, collection=collection, category=category
+        )
+        span.set_attribute("retrieval.results", len(results))
+        if results:
+            span.set_attribute("retrieval.top_score", results[0].score)
+        return results
 
 
 class PgVectorRetriever(BaseRetriever):
