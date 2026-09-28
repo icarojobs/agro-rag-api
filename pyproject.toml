@@ -28,6 +28,9 @@ dependencies = [
     "opentelemetry-instrumentation-fastapi>=0.66b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.66b0",
     "prometheus-fastapi-instrumentator>=7.0",
+    "pandas>=2.2",
+    "numpy>=2.0",
+    "scikit-learn>=1.5",
 ]
 
 [dependency-groups]
@@ -38,6 +41,7 @@ dev = [
     "httpx>=0.28",
     "ruff>=0.8",
     "mypy>=1.13",
+    "pandas-stubs>=3.0.5.260914",
 ]
 
 [project.scripts]
@@ -82,3 +86,7 @@ addopts = "--cov=agro_rag --cov-report=term-missing --cov-fail-under=85"
 [tool.coverage.run]
 branch = true
 source = ["agro_rag"]
+
+[[tool.mypy.overrides]]
+module = ["sklearn.*"]
+ignore_missing_imports = true
