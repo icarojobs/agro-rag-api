@@ -15,6 +15,14 @@ if TYPE_CHECKING:
 _TOKEN_RE = re.compile(r"\w+", re.UNICODE)
 
 
+# Models trained with asymmetric instructions expect different prefixes for
+# queries and passages (e.g. the E5 family).
+KNOWN_PREFIXES: dict[str, tuple[str, str]] = {
+    "intfloat/multilingual-e5-small": ("query: ", "passage: "),
+    "intfloat/multilingual-e5-base": ("query: ", "passage: "),
+}
+
+
 class SentenceTransformerEmbeddings(Embeddings):
     """Local Hugging Face model; vectors are L2-normalized so cosine == dot product."""
 
@@ -22,14 +30,18 @@ class SentenceTransformerEmbeddings(Embeddings):
         from sentence_transformers import SentenceTransformer
 
         self.model_name = model_name
+        self.query_prefix, self.document_prefix = KNOWN_PREFIXES.get(model_name, ("", ""))
         self._model: SentenceTransformer = SentenceTransformer(model_name, device=device)
 
-    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+    def _encode(self, texts: list[str]) -> list[list[float]]:
         vectors = self._model.encode(texts, batch_size=32, normalize_embeddings=True)
         return [v.tolist() for v in vectors]
 
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        return self._encode([self.document_prefix + t for t in texts])
+
     def embed_query(self, text: str) -> list[float]:
-        return self.embed_documents([text])[0]
+        return self._encode([self.query_prefix + text])[0]
 
 
 class HashingEmbeddings(Embeddings):
