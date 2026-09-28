@@ -30,7 +30,9 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH" \
     HF_HOME=/models
-RUN useradd --create-home --uid 1000 app && mkdir /models && chown app:app /models
+RUN useradd --create-home --uid 1000 app \
+    && mkdir -p /models /tmp/prometheus \
+    && chown app:app /models /tmp/prometheus
 WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app alembic.ini ./
