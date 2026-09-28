@@ -101,7 +101,12 @@ services:
       target: runtime
     ports:
       - "8000:8000"
-    environment: *app-env
+    environment:
+      <<: *app-env
+      # uvicorn reads WEB_CONCURRENCY; each worker loads its own copy of the model.
+      WEB_CONCURRENCY: ${API_WORKERS:-4}
+      OMP_NUM_THREADS: ${API_TORCH_THREADS:-2}
+      PROMETHEUS_MULTIPROC_DIR: /tmp/prometheus
     volumes:
       - hf-cache:/models
     depends_on:
@@ -128,6 +133,28 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  locust:
+    image: agro-rag-api:dev
+    build:
+      context: .
+      target: dev
+    profiles: ["load"]
+    user: "1000:1000"
+    command:
+      - locust
+      - -f
+      - loadtest/locustfile.py
+      - --host=http://api:8000
+      - --headless
+      - --users=${LOCUST_USERS:-50}
+      - --spawn-rate=${LOCUST_SPAWN_RATE:-10}
+      - --run-time=${LOCUST_RUN_TIME:-2m}
+      - --csv=loadtest/results/search
+      - --only-summary
+    volumes:
+      - ./loadtest:/app/loadtest
+      - ./eval:/app/eval:ro
 
 volumes:
   pgdata:
