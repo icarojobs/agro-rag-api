@@ -1,0 +1,72 @@
+{"id": "q001", "question": "Por que o alumínio trocável prejudica o crescimento das raízes?", "relevant": ["solo/acidez-e-calagem.md"]}
+{"id": "q002", "question": "Quanto tempo antes do plantio devo aplicar o calcário?", "relevant": ["solo/acidez-e-calagem.md"]}
+{"id": "q003", "question": "Qual fórmula uso para calcular a dose de calcário pela saturação por bases?", "relevant": ["solo/calculo-necessidade-calagem.md"]}
+{"id": "q004", "question": "Qual V% devo buscar na correção do solo para café?", "relevant": ["solo/calculo-necessidade-calagem.md", "culturas/cafe-adubacao.md"]}
+{"id": "q005", "question": "Quando é indicado aplicar gesso agrícola?", "relevant": ["solo/gessagem.md"]}
+{"id": "q006", "question": "Como estimar a dose de gesso a partir do teor de argila?", "relevant": ["solo/gessagem.md"]}
+{"id": "q007", "question": "Como reduzir a perda de amônia quando aplico ureia?", "relevant": ["solo/nitrogenio.md", "culturas/milho-adubacao-nitrogenada.md"]}
+{"id": "q008", "question": "O nitrato pode ser perdido por lixiviação?", "relevant": ["solo/nitrogenio.md"]}
+{"id": "q009", "question": "Por que os solos do Cerrado fixam tanto fósforo?", "relevant": ["solo/fosforo.md"]}
+{"id": "q010", "question": "Folhas de milho arroxeadas indicam falta de qual nutriente?", "relevant": ["solo/fosforo.md"]}
+{"id": "q011", "question": "Qual fonte de potássio usar em culturas sensíveis ao cloro?", "relevant": ["solo/potassio.md"]}
+{"id": "q012", "question": "Por que não colocar muito cloreto de potássio junto da semente?", "relevant": ["solo/potassio.md"]}
+{"id": "q013", "question": "Qual micronutriente mais falta nos solos do Cerrado?", "relevant": ["solo/micronutrientes.md"]}
+{"id": "q014", "question": "Qual a função do molibdênio na soja?", "relevant": ["solo/micronutrientes.md", "culturas/soja-fixacao-biologica.md"]}
+{"id": "q015", "question": "Qual a importância da matéria orgânica para a CTC de solos tropicais?", "relevant": ["solo/materia-organica.md"]}
+{"id": "q016", "question": "Como converter carbono orgânico em matéria orgânica na análise?", "relevant": ["solo/materia-organica.md"]}
+{"id": "q017", "question": "Quantas subamostras devo coletar em cada talhão para análise de solo?", "relevant": ["solo/amostragem-de-solo.md"]}
+{"id": "q018", "question": "Em que profundidade coletar solo para avaliar a necessidade de gesso?", "relevant": ["solo/amostragem-de-solo.md", "solo/gessagem.md"]}
+{"id": "q019", "question": "Como calcular a saturação por alumínio do solo?", "relevant": ["solo/interpretacao-analise-solo.md"]}
+{"id": "q020", "question": "Qual a relação ideal entre cálcio e magnésio no solo?", "relevant": ["solo/interpretacao-analise-solo.md"]}
+{"id": "q021", "question": "O que significa o estádio R5 da soja?", "relevant": ["culturas/soja-fenologia.md"]}
+{"id": "q022", "question": "Em qual fase a soja é mais sensível à seca e aos percevejos?", "relevant": ["culturas/soja-fenologia.md", "fitossanidade/percevejo-marrom-soja.md"]}
+{"id": "q023", "question": "Preciso adubar a soja com nitrogênio?", "relevant": ["culturas/soja-fixacao-biologica.md"]}
+{"id": "q024", "question": "Como saber se os nódulos da soja estão fixando nitrogênio?", "relevant": ["culturas/soja-fixacao-biologica.md"]}
+{"id": "q025", "question": "Qual o principal risco do milho plantado depois da soja?", "relevant": ["culturas/milho-safrinha.md"]}
+{"id": "q026", "question": "Em que meses se semeia o milho de segunda safra?", "relevant": ["culturas/milho-safrinha.md"]}
+{"id": "q027", "question": "Quanto nitrogênio o milho extrai por tonelada de grão?", "relevant": ["culturas/milho-adubacao-nitrogenada.md"]}
+{"id": "q028", "question": "Em quais estádios fazer a cobertura nitrogenada do milho?", "relevant": ["culturas/milho-adubacao-nitrogenada.md"]}
+{"id": "q029", "question": "Como parcelar a adubação do cafezal?", "relevant": ["culturas/cafe-adubacao.md"]}
+{"id": "q030", "question": "Que folhas coletar para análise foliar do café?", "relevant": ["culturas/cafe-adubacao.md"]}
+{"id": "q031", "question": "Para que serve a vinhaça no canavial?", "relevant": ["culturas/cana-de-acucar-manejo.md"]}
+{"id": "q032", "question": "Qual a diferença entre cana de ano e cana de ano e meio?", "relevant": ["culturas/cana-de-acucar-manejo.md"]}
+{"id": "q033", "question": "Por que o feijão precisa de nitrogênio em cobertura mesmo sendo leguminosa?", "relevant": ["culturas/feijao.md"]}
+{"id": "q034", "question": "O calor excessivo na floração afeta o feijão?", "relevant": ["culturas/feijao.md"]}
+{"id": "q035", "question": "Qual doença do trigo é favorecida por chuva no espigamento?", "relevant": ["culturas/trigo.md"]}
+{"id": "q036", "question": "Em que fase do trigo a adubação nitrogenada define o número de espigas?", "relevant": ["culturas/trigo.md"]}
+{"id": "q037", "question": "Para que serve o cloreto de mepiquat no algodão?", "relevant": ["culturas/algodao.md"]}
+{"id": "q038", "question": "Como a qualidade da fibra de algodão é avaliada?", "relevant": ["culturas/algodao.md"]}
+{"id": "q039", "question": "Quantos percevejos por metro justificam o controle na soja?", "relevant": ["fitossanidade/percevejo-marrom-soja.md"]}
+{"id": "q040", "question": "Onde o percevejo-marrom passa a entressafra?", "relevant": ["fitossanidade/percevejo-marrom-soja.md"]}
+{"id": "q041", "question": "Qual a porcentagem de refúgio no plantio de milho Bt?", "relevant": ["fitossanidade/lagarta-do-cartucho.md"]}
+{"id": "q042", "question": "Quando controlar a Spodoptera frugiperda no milho convencional?", "relevant": ["fitossanidade/lagarta-do-cartucho.md"]}
+{"id": "q043", "question": "Quando a Helicoverpa armigera foi identificada no Brasil?", "relevant": ["fitossanidade/helicoverpa.md"]}
+{"id": "q044", "question": "Quais estruturas da planta a Helicoverpa prefere atacar?", "relevant": ["fitossanidade/helicoverpa.md"]}
+{"id": "q045", "question": "Quais doenças a Dalbulus maidis transmite ao milho?", "relevant": ["fitossanidade/cigarrinha-do-milho.md"]}
+{"id": "q046", "question": "Por que eliminar o milho tiguera?", "relevant": ["fitossanidade/cigarrinha-do-milho.md"]}
+{"id": "q047", "question": "Qual o nível de frutos brocados para controlar a broca no café?", "relevant": ["fitossanidade/broca-do-cafe.md"]}
+{"id": "q048", "question": "Por que fazer o repasse depois da colheita do café?", "relevant": ["fitossanidade/broca-do-cafe.md"]}
+{"id": "q049", "question": "Como o bicudo danifica os botões florais do algodoeiro?", "relevant": ["fitossanidade/bicudo-do-algodoeiro.md"]}
+{"id": "q050", "question": "Por que destruir as soqueiras do algodão após a colheita?", "relevant": ["fitossanidade/bicudo-do-algodoeiro.md"]}
+{"id": "q051", "question": "Quais nematoides são mais importantes na soja?", "relevant": ["fitossanidade/nematoides.md"]}
+{"id": "q052", "question": "Como diagnosticar nematoides na lavoura?", "relevant": ["fitossanidade/nematoides.md"]}
+{"id": "q053", "question": "Qual vírus a mosca-branca transmite ao feijoeiro?", "relevant": ["fitossanidade/mosca-branca.md", "culturas/feijao.md"]}
+{"id": "q054", "question": "O que é fumagina?", "relevant": ["fitossanidade/mosca-branca.md"]}
+{"id": "q055", "question": "Qual fungo causa a ferrugem da soja?", "relevant": ["fitossanidade/ferrugem-asiatica.md"]}
+{"id": "q056", "question": "Por quanto tempo deve durar o vazio sanitário da soja?", "relevant": ["fitossanidade/ferrugem-asiatica.md"]}
+{"id": "q057", "question": "Qual a diferença entre nível de dano econômico e nível de controle?", "relevant": ["manejo/manejo-integrado-de-pragas.md"]}
+{"id": "q058", "question": "Qual porcentagem de desfolha justifica controlar lagartas na soja?", "relevant": ["manejo/manejo-integrado-de-pragas.md"]}
+{"id": "q059", "question": "Quais são os princípios do plantio direto?", "relevant": ["manejo/plantio-direto.md"]}
+{"id": "q060", "question": "Como resolver a compactação em áreas de plantio direto?", "relevant": ["manejo/plantio-direto.md"]}
+{"id": "q061", "question": "Quais os benefícios de alternar gramíneas e leguminosas?", "relevant": ["manejo/rotacao-de-culturas.md"]}
+{"id": "q062", "question": "A rotação ajuda a controlar plantas daninhas resistentes?", "relevant": ["manejo/rotacao-de-culturas.md"]}
+{"id": "q063", "question": "Qual planta de cobertura ajuda a reduzir nematoides de galha?", "relevant": ["manejo/plantas-de-cobertura.md"]}
+{"id": "q064", "question": "Qual cobertura usar para romper camadas compactadas?", "relevant": ["manejo/plantas-de-cobertura.md", "manejo/plantio-direto.md"]}
+{"id": "q065", "question": "Qual vespa é usada contra a broca-da-cana?", "relevant": ["manejo/controle-biologico.md"]}
+{"id": "q066", "question": "O que é produção on farm de biológicos?", "relevant": ["manejo/controle-biologico.md"]}
+{"id": "q067", "question": "Quais as condições de clima ideais para pulverizar?", "relevant": ["manejo/tecnologia-de-aplicacao.md"]}
+{"id": "q068", "question": "Como reduzir a deriva na pulverização?", "relevant": ["manejo/tecnologia-de-aplicacao.md"]}
+{"id": "q069", "question": "Como funciona a integração lavoura-pecuária com braquiária?", "relevant": ["manejo/integracao-lavoura-pecuaria.md"]}
+{"id": "q070", "question": "A ILP ajuda a recuperar pastagens degradadas?", "relevant": ["manejo/integracao-lavoura-pecuaria.md"]}
+{"id": "q071", "question": "O que é o ZARC?", "relevant": ["manejo/zoneamento-agricola.md"]}
+{"id": "q072", "question": "Seguir o zoneamento agrícola é exigido para acessar o Proagro?", "relevant": ["manejo/zoneamento-agricola.md"]}
