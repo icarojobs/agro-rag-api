@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -24,6 +25,15 @@ class IngestionStats:
     chunks: int = 0
 
 
+def _fingerprint(
+    doc: SourceDocument, embeddings: Embeddings, chunk_size: int, chunk_overlap: int
+) -> str:
+    """Changes whenever the text, the embedding model or the chunking parameters change."""
+    model = getattr(embeddings, "model_name", type(embeddings).__name__)
+    key = f"{doc.content_hash}:{model}:{chunk_size}:{chunk_overlap}"
+    return hashlib.sha256(key.encode()).hexdigest()
+
+
 async def ingest_documents(
     session: AsyncSession,
     embeddings: Embeddings,
@@ -43,7 +53,8 @@ async def ingest_documents(
 
     for doc in docs:
         current = existing.pop(doc.source, None)
-        if current is not None and current.content_hash == doc.content_hash:
+        fingerprint = _fingerprint(doc, embeddings, chunk_size, chunk_overlap)
+        if current is not None and current.content_hash == fingerprint:
             stats.skipped += 1
             continue
         if current is not None:
@@ -60,7 +71,7 @@ async def ingest_documents(
             source=doc.source,
             title=doc.title,
             category=doc.category,
-            content_hash=doc.content_hash,
+            content_hash=fingerprint,
             chunks=[
                 Chunk(chunk_index=i, content=text, embedding=vec)
                 for i, (text, vec) in enumerate(zip(pieces, vectors, strict=True))
