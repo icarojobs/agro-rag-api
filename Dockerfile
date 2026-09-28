@@ -35,6 +35,7 @@ WORKDIR /app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --chown=app:app alembic.ini ./
 COPY --chown=app:app corpus ./corpus
+COPY --chown=app:app eval ./eval
 USER app
 EXPOSE 8000
 CMD ["uvicorn", "agro_rag.main:app", "--host", "0.0.0.0", "--port", "8000"]
