@@ -11,6 +11,10 @@ class Settings(BaseSettings):
     app_name: str = "agro-rag-api"
     environment: str = "local"
     log_level: str = "INFO"
+    log_json: bool = True
+
+    otel_enabled: bool = False
+    otel_exporter_otlp_endpoint: str | None = None
 
     database_url: str = "postgresql+asyncpg://agro:agro@localhost:5433/agro"
     db_pool_size: int = 10

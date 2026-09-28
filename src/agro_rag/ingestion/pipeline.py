@@ -1,8 +1,8 @@
 import asyncio
-import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+import structlog
 from langchain_core.embeddings import Embeddings
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,7 +11,7 @@ from agro_rag.db.models import Chunk, Document
 from agro_rag.ingestion.chunking import chunk_document
 from agro_rag.ingestion.loader import SourceDocument, load_corpus
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger(__name__)
 
 
 @dataclass(slots=True)
@@ -76,7 +76,7 @@ async def ingest_documents(
         stats.removed = len(existing)
 
     await session.commit()
-    logger.info("ingestion finished", extra={"collection": collection, **asdict(stats)})
+    logger.info("ingestion_finished", collection=collection, **asdict(stats))
     return stats
 
 

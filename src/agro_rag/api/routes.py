@@ -16,6 +16,7 @@ from agro_rag.api.schemas import (
     Source,
 )
 from agro_rag.db.session import get_sessionmaker, ping
+from agro_rag.observability import GENERATION_SECONDS
 from agro_rag.rag import RagChain
 from agro_rag.retrieval import PgVectorRetriever, search
 
@@ -65,7 +66,8 @@ async def ask(
         collection=settings.collection,
         k=body.k,
     )
-    result = await RagChain(retriever, llm).ainvoke(body.question)
+    with GENERATION_SECONDS.labels("ask").time():
+        result = await RagChain(retriever, llm).ainvoke(body.question)
     return AskResponse(
         answer=result.answer,
         sources=[
@@ -90,7 +92,8 @@ async def agent(
         collection=settings.collection,
         k=body.k,
     )
-    state = await build_agent(retriever, llm).ainvoke({"question": body.question})
+    with GENERATION_SECONDS.labels("agent").time():
+        state = await build_agent(retriever, llm).ainvoke({"question": body.question})
     return AgentResponse(
         answer=state["answer"],
         sources=[

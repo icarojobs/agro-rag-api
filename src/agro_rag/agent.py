@@ -13,6 +13,7 @@ from langgraph.graph.state import CompiledStateGraph
 from langgraph.prebuilt import ToolNode
 
 from agro_rag.llm import NO_ANSWER, REWRITE_INSTRUCTION, YES_NO_INSTRUCTION
+from agro_rag.observability import TOOL_CALLS
 from agro_rag.rag import format_context
 from agro_rag.tools import liming_calculator
 
@@ -124,6 +125,10 @@ def build_agent(
     tool_node = ToolNode(TOOLS)
 
     async def tools(state: AgentState) -> AgentState:
+        last = state["messages"][-1]
+        if isinstance(last, AIMessage):
+            for call in last.tool_calls:
+                TOOL_CALLS.labels(call["name"]).inc()
         result = await tool_node.ainvoke(state)
         return {"messages": result["messages"], "steps": ["tools"]}
 
