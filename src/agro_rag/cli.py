@@ -2,12 +2,20 @@ import asyncio
 from pathlib import Path
 from typing import Annotated
 
+import pandas as pd
 import typer
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from agro_rag.config import get_settings
 from agro_rag.db.session import create_engine
 from agro_rag.embeddings import get_embeddings
+from agro_rag.evaluation.runner import (
+    EvalConfig,
+    EvalResult,
+    evaluate_config,
+    load_questions,
+    log_to_mlflow,
+)
 from agro_rag.ingestion.pipeline import IngestionStats, ingest_corpus
 
 app = typer.Typer(help="agro-rag command line tools", no_args_is_help=True)
@@ -55,3 +63,76 @@ def ingest(
         f"documents={stats.documents} created={stats.created} updated={stats.updated} "
         f"skipped={stats.skipped} removed={stats.removed} chunks={stats.chunks}"
     )
+
+
+def _int_list(value: str) -> list[int]:
+    return [int(v) for v in value.split(",") if v.strip()]
+
+
+async def _evaluate(
+    questions_path: Path,
+    corpus: Path,
+    configs: list[EvalConfig],
+    tracking_uri: str | None,
+    experiment: str,
+) -> list[EvalResult]:
+    questions = load_questions(questions_path)
+    embeddings = get_embeddings()
+    engine = create_engine()
+    results = []
+    try:
+        async with async_sessionmaker(engine)() as session:
+            for config in configs:
+                result = await evaluate_config(session, embeddings, corpus, questions, config)
+                if tracking_uri:
+                    result.params["mlflow_run_id"] = log_to_mlflow(result, tracking_uri, experiment)
+                results.append(result)
+    finally:
+        await engine.dispose()
+    return results
+
+
+@app.command()
+def evaluate(
+    questions: Annotated[Path, typer.Option(help="JSONL with id, question, relevant")] = Path(
+        "eval/questions.jsonl"
+    ),
+    corpus: Annotated[Path | None, typer.Option()] = None,
+    chunk_sizes: Annotated[str, typer.Option(help="Comma-separated chunk sizes")] = "300,500,800",
+    overlaps: Annotated[str, typer.Option(help="Comma-separated overlaps")] = "50",
+    k: Annotated[str, typer.Option(help="Cut-offs for recall/nDCG")] = "1,3,5,10",
+    mlflow_uri: Annotated[str | None, typer.Option(help="Empty string disables MLflow")] = None,
+    experiment: Annotated[str | None, typer.Option()] = None,
+) -> None:
+    """Measure retrieval quality (recall@k, MRR, nDCG) and log each run to MLflow."""
+    settings = get_settings()
+    model = settings.embedding_model if settings.embedding_provider != "hashing" else "hashing"
+    configs = [
+        EvalConfig(
+            chunk_size=size, chunk_overlap=overlap, ks=tuple(_int_list(k)), embedding_model=model
+        )
+        for size in _int_list(chunk_sizes)
+        for overlap in _int_list(overlaps)
+    ]
+    tracking_uri = settings.mlflow_tracking_uri if mlflow_uri is None else mlflow_uri
+    results = asyncio.run(
+        _evaluate(
+            questions,
+            corpus or settings.corpus_dir,
+            configs,
+            tracking_uri or None,
+            experiment or settings.mlflow_experiment,
+        )
+    )
+    table = pd.DataFrame(
+        [
+            {
+                "chunk_size": r.config.chunk_size,
+                "overlap": r.config.chunk_overlap,
+                "chunks": r.params["n_chunks"],
+                **r.summary,
+            }
+            for r in results
+        ]
+    )
+    typer.echo(table.round(3).to_string(index=False))

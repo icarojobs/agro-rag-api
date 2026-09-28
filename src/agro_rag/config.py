@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_num_ctx: int = 4096
 
+    mlflow_tracking_uri: str = "http://localhost:5000"
+    mlflow_experiment: str = "agro-rag-retrieval"
+
     corpus_dir: Path = Path("corpus")
     collection: str = "default"
     chunk_size: int = 500
