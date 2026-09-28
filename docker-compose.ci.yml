@@ -5,6 +5,7 @@ services:
     environment:
       AGRO_LLM_PROVIDER: fake
       AGRO_EMBEDDING_PROVIDER: hashing
+      AGRO_OTEL_ENABLED: "false"
     depends_on: !override
       migrate:
         condition: service_completed_successfully

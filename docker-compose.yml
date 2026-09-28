@@ -5,6 +5,7 @@ x-app-env: &app-env
   AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
   AGRO_OTEL_ENABLED: "true"
   AGRO_OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  AGRO_MLFLOW_TRACKING_URI: http://mlflow:5000
 
 services:
   db:
@@ -61,6 +62,27 @@ services:
     depends_on:
       - api
 
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v3.16.1
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=sqlite:////mlflow/mlflow.db
+      - --artifacts-destination=/mlflow/artifacts
+      - --serve-artifacts
+      - --allowed-hosts=*
+    ports:
+      - "5000:5000"
+    volumes:
+      - mlflow:/mlflow
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
   migrate:
     image: agro-rag-api:latest
     build:
@@ -111,3 +133,4 @@ volumes:
   pgdata:
   hf-cache:
   ollama:
+  mlflow:
