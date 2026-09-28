@@ -3,6 +3,8 @@ x-app-env: &app-env
   AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
   AGRO_OLLAMA_BASE_URL: http://ollama:11434
   AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
+  AGRO_OTEL_ENABLED: "true"
+  AGRO_OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
 
 services:
   db:
@@ -42,6 +44,22 @@ services:
     depends_on:
       ollama:
         condition: service_healthy
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.65.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686"
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - api
 
   migrate:
     image: agro-rag-api:latest
