@@ -65,3 +65,26 @@ class AgentResponse(BaseModel):
     sources: list[Source]
     steps: list[str]
     took_ms: float
+
+
+class IngestRequest(BaseModel):
+    source: str = Field(min_length=1, max_length=200, examples=["solo/calagem-nova.md"])
+    title: str = Field(min_length=1, max_length=200, examples=["Calagem em plantio direto"])
+    category: str = Field(min_length=1, max_length=50, examples=["solo"])
+    content: str = Field(min_length=1, max_length=50_000)
+    collection: str | None = None
+
+
+class IngestAccepted(BaseModel):
+    job_id: str
+    status: str
+
+
+class IngestJob(BaseModel):
+    job_id: str
+    status: str
+    attempts: int
+    source: str
+    collection: str
+    error: str | None = None
+    result: dict[str, int] | None = None

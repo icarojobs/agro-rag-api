@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import structlog
+from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
@@ -37,12 +38,23 @@ async def llm_unavailable(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def queue_unavailable(_: Request, exc: Exception) -> JSONResponse:
+    structlog.get_logger("agro_rag").warning("queue_unavailable", error=type(exc).__name__)
+    return JSONResponse(
+        {"detail": "The ingestion queue is unavailable, try again shortly."},
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        headers={"Retry-After": "10"},
+    )
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     configure_logging(settings)
     app = FastAPI(title=settings.app_name, version=__version__, lifespan=lifespan)
     app.middleware("http")(request_logging_middleware)
     app.include_router(router)
+    for aws_error in (BotoCoreError, ClientError):
+        app.add_exception_handler(aws_error, queue_unavailable)
     for error in LLM_UNAVAILABLE_ERRORS:
         app.add_exception_handler(error, llm_unavailable)
     configure_metrics(app)

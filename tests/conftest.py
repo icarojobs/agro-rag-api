@@ -19,6 +19,7 @@ from agro_rag.cache import get_cache
 from agro_rag.config import get_settings
 from agro_rag.db.session import get_engine, get_sessionmaker
 from agro_rag.embeddings import get_embeddings
+from agro_rag.ingestion.queue import get_ingestion_queue
 from agro_rag.llm import get_llm
 from agro_rag.main import create_app
 
@@ -36,6 +37,7 @@ def reset_cached_settings() -> Iterator[None]:
     yield
     get_settings.cache_clear()
     get_cache.cache_clear()
+    get_ingestion_queue.cache_clear()
     get_embeddings.cache_clear()
     get_llm.cache_clear()
 

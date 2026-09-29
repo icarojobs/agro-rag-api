@@ -43,7 +43,9 @@ async def ingest_documents(
     collection: str,
     chunk_size: int,
     chunk_overlap: int,
+    prune: bool = True,
 ) -> IngestionStats:
+    """Index `docs`. With `prune`, documents of the collection missing from `docs` are removed."""
     stats = IngestionStats(documents=len(docs))
     existing = {
         d.source: d
@@ -81,7 +83,7 @@ async def ingest_documents(
         session.add(record)
         stats.chunks += len(pieces)
 
-    if existing:
+    if prune and existing:
         await session.execute(
             delete(Document).where(Document.id.in_(d.id for d in existing.values()))
         )

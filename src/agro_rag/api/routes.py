@@ -1,15 +1,26 @@
 import time
+from typing import Annotated
 
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Header, HTTPException, Response, status
 
 from agro_rag import __version__
 from agro_rag.agent import build_agent
-from agro_rag.api.deps import CacheDep, EmbeddingsDep, LLMDep, SessionDep, SettingsDep
+from agro_rag.api.deps import (
+    CacheDep,
+    EmbeddingsDep,
+    IngestionQueueDep,
+    LLMDep,
+    SessionDep,
+    SettingsDep,
+)
 from agro_rag.api.schemas import (
     AgentResponse,
     AskRequest,
     AskResponse,
     HealthResponse,
+    IngestAccepted,
+    IngestJob,
+    IngestRequest,
     LivenessResponse,
     ReadinessResponse,
     SearchHit,
@@ -19,6 +30,7 @@ from agro_rag.api.schemas import (
 )
 from agro_rag.cache import RedisCache, make_key
 from agro_rag.db.session import get_sessionmaker, ping
+from agro_rag.ingestion.jobs import IngestionMessage
 from agro_rag.observability import GENERATION_SECONDS
 from agro_rag.rag import RagChain
 from agro_rag.resilience import breaker_states
@@ -176,3 +188,41 @@ async def agent(
         steps=state["steps"],
         took_ms=round((time.perf_counter() - started) * 1000, 2),
     )
+
+
+_QUEUE_OFF = HTTPException(
+    status.HTTP_503_SERVICE_UNAVAILABLE, "Asynchronous ingestion is not configured."
+)
+
+
+@router.post(
+    "/ingest/documents",
+    response_model=IngestAccepted,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["ingestion"],
+)
+async def enqueue_document(
+    body: IngestRequest,
+    queue: IngestionQueueDep,
+    settings: SettingsDep,
+    idempotency_key: Annotated[str | None, Header(max_length=200)] = None,
+) -> IngestAccepted:
+    """Queue a document for indexing. A repeated `Idempotency-Key` returns the same job."""
+    if queue is None:
+        raise _QUEUE_OFF
+    fields = body.model_dump(exclude={"collection"})
+    message = IngestionMessage(
+        job_id="", collection=body.collection or settings.collection, **fields
+    )
+    job_id, _ = await queue.enqueue(message, idempotency_key=idempotency_key)
+    return IngestAccepted(job_id=job_id, status="queued")
+
+
+@router.get("/ingest/jobs/{job_id}", response_model=IngestJob, tags=["ingestion"])
+async def ingestion_job(job_id: str, queue: IngestionQueueDep) -> IngestJob:
+    if queue is None:
+        raise _QUEUE_OFF
+    job = await queue.job(job_id)
+    if job is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Job not found.")
+    return IngestJob.model_validate(job)

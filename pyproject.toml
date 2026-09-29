@@ -94,5 +94,5 @@ branch = true
 source = ["agro_rag"]
 
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "botocore.*", "aioboto3.*", "aiobotocore.*"]
+module = ["sklearn.*", "botocore.*", "aioboto3.*", "boto3.*", "aiobotocore.*"]
 ignore_missing_imports = true
