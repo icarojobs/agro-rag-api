@@ -13,7 +13,7 @@ from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.sdk.resources import SERVICE_NAME, SERVICE_VERSION, Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from prometheus_client import Counter, Histogram
+from prometheus_client import Counter, Gauge, Histogram
 from prometheus_fastapi_instrumentator import Instrumentator
 from sqlalchemy.ext.asyncio import AsyncEngine
 
@@ -35,8 +35,23 @@ TOOL_CALLS = Counter("agro_rag_tool_calls_total", "Tool calls executed by the ag
 
 CACHE_REQUESTS = Counter(
     "agro_rag_cache_requests_total",
-    "Redis cache lookups by cache name and outcome (hit, miss or error)",
+    "Redis cache lookups by cache name and outcome (hit, miss, error or skipped)",
     ["cache", "result"],
+)
+
+DEPENDENCY_RETRIES = Counter(
+    "agro_rag_dependency_retries_total", "Retries of failed calls to a dependency", ["dependency"]
+)
+BREAKER_REJECTIONS = Counter(
+    "agro_rag_circuit_breaker_rejections_total",
+    "Calls rejected without reaching the dependency because its circuit was open",
+    ["dependency"],
+)
+BREAKER_STATE = Gauge(
+    "agro_rag_circuit_breaker_state",
+    "Circuit breaker state per dependency: 0 closed, 1 half-open, 2 open",
+    ["dependency"],
+    multiprocess_mode="livemostrecent",
 )
 
 tracer = trace.get_tracer("agro_rag")

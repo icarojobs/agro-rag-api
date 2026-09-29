@@ -92,7 +92,7 @@ curl -s localhost:8000/agent -H 'content-type: application/json' \
 # answer: "A necessidade de calagem para esse solo é de **2.50 t/ha**."
 ```
 
-Também existem `GET /health` (verifica o banco) e `GET /metrics` (Prometheus).
+Também existem `GET /health` (verifica o banco), `GET /livez`, `GET /readyz` (veja Resiliência) e `GET /metrics` (Prometheus).
 
 ## Cache (Redis)
 
@@ -108,6 +108,19 @@ O `/search`, o `/ask` e o retriever do `/agent` usam cache-aside no Redis:
 - **Degradação graciosa:** qualquer falha do Redis (recusa de conexão, timeout de `AGRO_REDIS_TIMEOUT_SECONDS` = 0,25 s, valor corrompido) é tratada como cache miss, registrada em log e contada; a requisição segue para o banco e nunca vira 5xx.
 - **Invalidação:** a ingestão que cria, atualiza ou remove documentos apaga (via `SCAN`) as chaves `search` e `answer` da coleção.
 - **Métricas:** `agro_rag_cache_requests_total{cache,result}` com `result` em `hit`, `miss` ou `error`.
+
+## Resiliência
+
+As chamadas ao Ollama e ao Redis passam por `src/agro_rag/resilience.py`:
+
+- **Timeouts:** Ollama com conexão de 3 s e leitura de 120 s (`AGRO_OLLAMA_CONNECT_TIMEOUT_SECONDS`, `AGRO_OLLAMA_TIMEOUT_SECONDS`); Redis com 0,25 s por operação.
+- **Retry com backoff exponencial e full jitter:** espera sorteada em `U(0, min(máx, base × 2^n))`. O Ollama tenta até 3 vezes (base 0,3 s) em erro de conexão, `RemoteProtocolError`, `ReadError` e HTTP 502/503/504; um timeout de leitura não é repetido, pois a chamada já gastou o orçamento de tempo. O Redis tenta 2 vezes (base 20 ms).
+- **Circuit breaker:** abre após falhas consecutivas (5 no Ollama, 3 no Redis) e rejeita as chamadas sem tocar a dependência. Passado o tempo de recuperação (30 s e 10 s) deixa passar uma chamada de teste (half-open): se ela funciona o circuito fecha, senão reabre. Cada tentativa passa pelo breaker, então os retries param assim que ele abre. O breaker é por processo (cada worker do uvicorn tem o seu).
+- **Ollama fora do ar:** `/ask` e `/agent` respondem `503` com `Retry-After: 30` em vez de 500; `/search` continua funcionando.
+- **Redis fora do ar:** vira cache miss, sem erro para o cliente (veja Cache).
+- **Métricas:** `agro_rag_dependency_retries_total`, `agro_rag_circuit_breaker_state` (0 fechado, 1 half-open, 2 aberto) e `agro_rag_circuit_breaker_rejections_total`, por dependência.
+
+Probes: `GET /livez` só diz que o processo responde (não consulta nenhuma dependência, para uma queda do banco não reiniciar o pod). `GET /readyz` devolve 503 apenas quando o banco não responde; o estado do cache (`ok`, `unavailable` ou `disabled`) e do LLM (`ok`, `unavailable` quando o circuito do Ollama está aberto, ou `fake`) é informativo, porque sem eles a API degrada, mas continua atendendo.
 
 ## Corpus e avaliação
 
@@ -191,6 +204,17 @@ Mesmo cenário do Locust acima (4 workers, 2 min, mesma máquina), com o Redis v
 
 **`/ask` com cache de resposta** (Ollama em CPU, mesma pergunta repetida 3 vezes): 19,2 s na primeira chamada (miss) e 2 ms e 50 ms nas seguintes (hit). Amostra de uma pergunta, só para ordem de grandeza.
 
+**Redis travado (não parado):** com `docker compose pause redis` a conexão é aceita, mas nada responde, o pior caso para um cache. Mesmo teste de 50 usuários por 60 s, com o Redis pausado durante toda a execução:
+
+| Versão | Requisições | Falhas | Throughput | p50 | p95 | p99 |
+|---|---:|---:|---:|---:|---:|---:|
+| Só timeout de 0,25 s (sem breaker) | 2.142 | 0 | 35,88 req/s | 1.000 ms | 1.100 ms | 1.300 ms |
+| Retry + circuit breaker | 6.502 | 0 | 108,85 req/s | 98 ms | 400 ms | 610 ms |
+
+Sem o breaker, cada `/search` pagava quatro timeouts de 0,25 s (leitura e escrita dos dois caches) e ficava em cerca de 1 s. Com o breaker aberto a API volta a ~110 req/s, equivalente à execução sem cache (114 req/s). O breaker abriu nas primeiras requisições e rejeitou 26.047 chamadas ao Redis durante o teste; ao despausar, fechou sozinho na primeira chamada de teste depois de 10 s.
+
+**Ollama parado** (`docker compose stop ollama`, `/ask` com perguntas diferentes): as duas primeiras requisições levaram 0,59 s e 0,55 s (3 tentativas com backoff, todas recusadas), o circuito abriu e as 12 seguintes responderam `503` em cerca de 21 ms cada (a busca ainda roda antes de o breaker rejeitar), com `/search` respondendo 200 normalmente em 19 ms. `/readyz` passou a mostrar `"llm": "unavailable"`. Depois de `docker compose start ollama` e 30 s, a chamada de teste passou, o circuito fechou e o `/ask` voltou a responder 200.
+
 ### Latência com LLM (Ollama em CPU, `qwen2.5:3b`)
 
 Amostra pequena, apenas para ordem de grandeza: 5 perguntas no `/ask` e 4 no `/agent`, sequenciais.
@@ -204,7 +228,7 @@ O agente faz uma chamada ao LLM para cada trecho recuperado (grading) antes de r
 
 ### Testes
 
-68 testes, cobertura de 98% (`docker compose --profile test run --rm tests`).
+100 testes, cobertura de 98% (`docker compose --profile test run --rm tests`).
 
 ## Estrutura
 
@@ -215,6 +239,7 @@ src/agro_rag/
   ingestion/      loader de Markdown, chunking e pipeline de ingestão
   evaluation/     métricas de ranking e runner com MLflow
   cache.py        cache-aside no Redis com degradação graciosa
+  resilience.py   retry com backoff e jitter, circuit breaker e transporte HTTP resiliente
   embeddings.py   sentence-transformers e embeddings determinísticos para testes
   retrieval.py    busca no pgvector e retriever do LangChain
   rag.py          cadeia RAG (LCEL)
