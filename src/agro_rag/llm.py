@@ -3,6 +3,7 @@ from collections.abc import Callable, Sequence
 from functools import lru_cache
 from typing import Any
 
+import httpx
 from langchain_core.callbacks import CallbackManagerForLLMRun
 from langchain_core.language_models import BaseChatModel, LanguageModelInput
 from langchain_core.messages import AIMessage, BaseMessage, ToolCall, ToolMessage
@@ -10,9 +11,19 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.runnables import Runnable
 from langchain_core.tools import BaseTool
 from langchain_ollama import ChatOllama
+from ollama import ResponseError
 from pydantic import Field
 
 from agro_rag.config import get_settings
+from agro_rag.resilience import CircuitOpenError, ResilientTransport, RetryPolicy, get_breaker
+
+# What a failed Ollama call can raise once retries are exhausted or the circuit is open.
+LLM_UNAVAILABLE_ERRORS: tuple[type[Exception], ...] = (
+    CircuitOpenError,
+    httpx.HTTPError,
+    ResponseError,
+    ConnectionError,
+)
 
 NO_ANSWER = "Não encontrei informações suficientes na base de conhecimento para responder."
 YES_NO_INSTRUCTION = "Responda apenas 'sim' ou 'não'."
@@ -108,4 +119,21 @@ def get_llm() -> BaseChatModel:
         model=settings.ollama_model,
         temperature=settings.llm_temperature,
         num_ctx=settings.llm_num_ctx,
+        async_client_kwargs={
+            "timeout": httpx.Timeout(
+                settings.ollama_timeout_seconds, connect=settings.ollama_connect_timeout_seconds
+            ),
+            "transport": ResilientTransport(
+                httpx.AsyncHTTPTransport(),
+                get_breaker(
+                    "ollama",
+                    failure_threshold=settings.ollama_breaker_failures,
+                    recovery_timeout=settings.ollama_breaker_recovery_seconds,
+                ),
+                RetryPolicy(
+                    attempts=settings.ollama_retry_attempts,
+                    base_delay=settings.ollama_retry_base_delay_seconds,
+                ),
+            ),
+        },
     )

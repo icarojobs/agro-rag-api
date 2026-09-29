@@ -19,6 +19,7 @@ from agro_rag.embeddings import HashingEmbeddings
 from agro_rag.ingestion.pipeline import ingest_corpus
 from agro_rag.main import create_app
 from agro_rag.observability import CACHE_REQUESTS
+from agro_rag.resilience import CircuitBreaker, RetryPolicy
 
 
 class _DownRedis:
@@ -72,7 +73,11 @@ def cache(fake_redis: FakeAsyncRedis) -> RedisCache:
 
 @pytest.fixture
 def down_cache() -> RedisCache:
-    return RedisCache(_DownRedis())  # type: ignore[arg-type]
+    return RedisCache(
+        _DownRedis(),  # type: ignore[arg-type]
+        breaker=CircuitBreaker("test-down", failure_threshold=1000),
+        policy=RetryPolicy(attempts=1),
+    )
 
 
 @pytest.fixture

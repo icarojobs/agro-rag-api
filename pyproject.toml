@@ -21,6 +21,7 @@ dependencies = [
     "langchain-text-splitters>=1.0",
     "typer>=0.15",
     "langchain-ollama>=1.0",
+    "ollama>=0.5",
     "langgraph>=1.0",
     "structlog>=24.4",
     "opentelemetry-sdk>=1.45",

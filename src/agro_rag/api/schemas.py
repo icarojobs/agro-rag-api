@@ -7,6 +7,18 @@ class HealthResponse(BaseModel):
     database: str
 
 
+class LivenessResponse(BaseModel):
+    status: str
+
+
+class ReadinessResponse(BaseModel):
+    status: str
+    version: str
+    database: str
+    cache: str
+    llm: str
+
+
 class SearchRequest(BaseModel):
     query: str = Field(min_length=3, max_length=500, examples=["como calcular a dose de calcário?"])
     k: int = Field(default=5, ge=1, le=20)

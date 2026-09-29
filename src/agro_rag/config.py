@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # Cache is optional: leave unset to run without Redis.
     redis_url: str | None = None
     redis_timeout_seconds: float = 0.25
+    redis_retry_attempts: int = 2
+    redis_retry_base_delay_seconds: float = 0.02
+    redis_breaker_failures: int = 3
+    redis_breaker_recovery_seconds: float = 10.0
     cache_ttl_seconds: int = 300
     cache_embedding_ttl_seconds: int = 3600
 
@@ -34,6 +38,12 @@ class Settings(BaseSettings):
     ollama_model: str = "qwen2.5:3b"
     llm_temperature: float = 0.0
     llm_num_ctx: int = 4096
+    ollama_connect_timeout_seconds: float = 3.0
+    ollama_timeout_seconds: float = 120.0
+    ollama_retry_attempts: int = 3
+    ollama_retry_base_delay_seconds: float = 0.3
+    ollama_breaker_failures: int = 5
+    ollama_breaker_recovery_seconds: float = 30.0
 
     mlflow_tracking_uri: str = "http://localhost:5000"
     mlflow_experiment: str = "agro-rag-retrieval"

@@ -10,15 +10,18 @@ from agro_rag.api.schemas import (
     AskRequest,
     AskResponse,
     HealthResponse,
+    LivenessResponse,
+    ReadinessResponse,
     SearchHit,
     SearchRequest,
     SearchResponse,
     Source,
 )
-from agro_rag.cache import make_key
+from agro_rag.cache import RedisCache, make_key
 from agro_rag.db.session import get_sessionmaker, ping
 from agro_rag.observability import GENERATION_SECONDS
 from agro_rag.rag import RagChain
+from agro_rag.resilience import breaker_states
 from agro_rag.retrieval import PgVectorRetriever, search
 
 router = APIRouter()
@@ -33,6 +36,41 @@ async def health(session: SessionDep, response: Response) -> HealthResponse:
         status="ok" if db_ok else "degraded",
         version=__version__,
         database="ok" if db_ok else "unavailable",
+    )
+
+
+async def _cache_status(cache: RedisCache | None) -> str:
+    if cache is None:
+        return "disabled"
+    return "ok" if await cache.ping() else "unavailable"
+
+
+@router.get("/livez", response_model=LivenessResponse, tags=["ops"])
+async def liveness() -> LivenessResponse:
+    """The process is up. It checks no dependency, so a slow database never restarts the pod."""
+    return LivenessResponse(status="ok")
+
+
+@router.get("/readyz", response_model=ReadinessResponse, tags=["ops"])
+async def readiness(
+    session: SessionDep, response: Response, settings: SettingsDep, cache: CacheDep
+) -> ReadinessResponse:
+    """Ready when the database answers. Redis and Ollama only degrade the service, so they are
+    reported but do not take the pod out of rotation."""
+    db_ok = await ping(session)
+    if not db_ok:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    cache_status = await _cache_status(cache)
+    if settings.llm_provider == "fake":
+        llm_status = "fake"
+    else:
+        llm_status = "unavailable" if breaker_states().get("ollama") == "open" else "ok"
+    return ReadinessResponse(
+        status="ready" if db_ok else "not_ready",
+        version=__version__,
+        database="ok" if db_ok else "unavailable",
+        cache=cache_status,
+        llm=llm_status,
     )
 
 
