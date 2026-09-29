@@ -1,0 +1,17 @@
+# Local cluster (kind): offline embeddings and a fake LLM, so the pods need no model
+# download and no Ollama. The api image is loaded with `kind load docker-image`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../base
+patches:
+  - target:
+      kind: ConfigMap
+      name: agro-rag-config
+    patch: |-
+      - op: add
+        path: /data/AGRO_EMBEDDING_PROVIDER
+        value: hashing
+      - op: add
+        path: /data/AGRO_LLM_PROVIDER
+        value: fake
