@@ -1,13 +1,12 @@
 import json
 import os
-import uuid
 from collections.abc import AsyncIterator
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from agro_rag.aws import Infra, aws_client, ensure_infrastructure
+from agro_rag.aws import Infra, aws_client
 from agro_rag.config import Settings, get_settings
 from agro_rag.ingestion.jobs import IngestionMessage, JobAlreadyDoneError, JobStore, job_id_for
 from agro_rag.ingestion.queue import IngestionQueue, get_ingestion_queue
@@ -23,23 +22,6 @@ DOC = {
     "category": "solo",
     "content": "A calagem em plantio direto é feita na superfície, sem incorporação.",
 }
-
-
-@pytest.fixture
-async def isolated(monkeypatch: pytest.MonkeyPatch) -> Infra:
-    """Fresh topic, queues and table per test, so tests never see each other's messages."""
-    suffix = uuid.uuid4().hex[:8]
-    for env, name in {
-        "TOPIC": "topic",
-        "QUEUE": "jobs",
-        "DLQ": "dlq",
-        "AUDIT_QUEUE": "audit",
-        "TABLE": "table",
-    }.items():
-        monkeypatch.setenv(f"AGRO_INGESTION_{env}", f"t-{name}-{suffix}")
-    get_settings.cache_clear()
-    get_ingestion_queue.cache_clear()
-    return await ensure_infrastructure(get_settings())
 
 
 @pytest.fixture
@@ -89,6 +71,7 @@ async def test_repeated_idempotency_key_enqueues_once(api: AsyncClient, isolated
 
     assert first.status_code == second.status_code == 202
     assert first.json()["job_id"] == second.json()["job_id"]
+    assert second.json()["status"] == "queued"
     assert len(await _messages(isolated.queue_url, get_settings())) == 1
 
 

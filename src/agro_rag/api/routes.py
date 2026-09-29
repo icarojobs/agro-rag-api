@@ -214,8 +214,9 @@ async def enqueue_document(
     message = IngestionMessage(
         job_id="", collection=body.collection or settings.collection, **fields
     )
-    job_id, _ = await queue.enqueue(message, idempotency_key=idempotency_key)
-    return IngestAccepted(job_id=job_id, status="queued")
+    job_id, created = await queue.enqueue(message, idempotency_key=idempotency_key)
+    job = None if created else await queue.job(job_id)
+    return IngestAccepted(job_id=job_id, status=str(job["status"]) if job else "queued")
 
 
 @router.get("/ingest/jobs/{job_id}", response_model=IngestJob, tags=["ingestion"])

@@ -9,6 +9,7 @@ Tudo roda localmente com `docker compose up`, sem chave de API externa.
 - **API:** Python 3.12, FastAPI, Pydantic v2, uv
 - **Banco vetorial:** PostgreSQL 17 + pgvector (índice HNSW, distância de cosseno), SQLAlchemy 2 async + asyncpg, Alembic
 - **Cache:** Redis 7 (cache-aside com TTL, degradação graciosa), redis-py asyncio
+- **Mensageria:** AWS SNS + SQS (com DLQ) e DynamoDB via aioboto3, emulados localmente pelo floci
 - **Embeddings:** `intfloat/multilingual-e5-small` via sentence-transformers (CPU)
 - **LLM / orquestração:** LangChain (LCEL, retriever próprio), LangGraph (agente com grading e ferramenta), Ollama com `qwen2.5:3b`
 - **Avaliação:** recall@k, MRR e nDCG com numpy, pandas e scikit-learn; experimentos registrados no MLflow
@@ -59,7 +60,7 @@ flowchart LR
 Pré-requisitos: Docker e Docker Compose.
 
 ```bash
-docker compose up -d --wait                 # db, redis, migrate, ollama (+ pull do modelo), api, mlflow, jaeger, prometheus
+docker compose up -d --wait                 # db, redis, floci, aws-init, migrate, worker, ollama (+ pull do modelo), api, mlflow, jaeger, prometheus
 docker compose run --rm api agro-rag ingest # indexa os 36 documentos do corpus
 ```
 
@@ -121,6 +122,36 @@ As chamadas ao Ollama e ao Redis passam por `src/agro_rag/resilience.py`:
 - **Métricas:** `agro_rag_dependency_retries_total`, `agro_rag_circuit_breaker_state` (0 fechado, 1 half-open, 2 aberto) e `agro_rag_circuit_breaker_rejections_total`, por dependência.
 
 Probes: `GET /livez` só diz que o processo responde (não consulta nenhuma dependência, para uma queda do banco não reiniciar o pod). `GET /readyz` devolve 503 apenas quando o banco não responde; o estado do cache (`ok`, `unavailable` ou `disabled`) e do LLM (`ok`, `unavailable` quando o circuito do Ollama está aberto, ou `fake`) é informativo, porque sem eles a API degrada, mas continua atendendo.
+
+## Ingestão assíncrona (SNS, SQS e DynamoDB)
+
+Tudo roda no [floci](https://floci.io), um emulador local da AWS (`floci/floci:2.1.0` no compose, credenciais falsas, sem conta na AWS). O serviço one-shot `aws-init` (`agro-rag aws-init`) cria a infraestrutura de forma idempotente.
+
+```mermaid
+flowchart LR
+    C[Cliente] -->|POST /ingest/documents| API[FastAPI]
+    API -->|job queued| DDB[(DynamoDB<br/>agro-ingestion-jobs)]
+    API -->|publish| SNS{{SNS<br/>agro-ingestion}}
+    SNS --> Q[SQS<br/>agro-ingestion-jobs]
+    SNS --> A[SQS<br/>agro-ingestion-audit]
+    Q -->|long polling| W[worker<br/>agro-rag worker]
+    W -->|status| DDB
+    W --> PG[(pgvector)]
+    Q -.após 3 recebimentos.-> D[DLQ<br/>agro-ingestion-dlq]
+```
+
+```bash
+curl -s localhost:8000/ingest/documents -H 'content-type: application/json' -H 'Idempotency-Key: meu-upload-1' \
+  -d '{"source": "solo/palhada.md", "title": "Palhada e nitrogênio", "category": "solo", "content": "..."}'
+# {"job_id": "6b01c3...", "status": "queued"}   (202)
+curl -s localhost:8000/ingest/jobs/6b01c3...    # queued -> processing -> done | failed
+```
+
+- **Idempotência:** o `Idempotency-Key` gera um `job_id` estável e o registro do job é criado com escrita condicional no DynamoDB (`attribute_not_exists`), então repetir o POST não enfileira duas vezes. No consumo, um job já `done` é confirmado sem reprocessar (a mensagem é entregue pelo menos uma vez), e o pipeline ainda ignora documentos com o mesmo hash de conteúdo.
+- **Visibility timeout e DLQ:** a fila tem `VisibilityTimeout` de 60 s e `RedrivePolicy` com `maxReceiveCount` 3. O worker só apaga a mensagem depois do job concluído; se falhar, ela volta à fila após o timeout e, na terceira falha, vai para a DLQ. Mensagens inválidas (JSON quebrado) seguem o mesmo caminho.
+- **Fan-out:** o tópico SNS entrega (raw) para duas filas, a de ingestão e uma de auditoria, que nada consome.
+- **Falhas da AWS:** se o SNS ou o DynamoDB estiverem fora do ar, o `POST` responde `503` com `Retry-After` e o registro do job é removido; a API continua servindo as demais rotas. Sem `AGRO_AWS_ENDPOINT_URL` a ingestão assíncrona fica desligada (503).
+- **Testes:** os testes de integração rodam contra o floci no compose e na CI (provisionamento, fan-out, redrive, idempotência, retry, DLQ e o loop real do worker).
 
 ## Corpus e avaliação
 
@@ -228,7 +259,7 @@ O agente faz uma chamada ao LLM para cada trecho recuperado (grading) antes de r
 
 ### Testes
 
-100 testes, cobertura de 98% (`docker compose --profile test run --rm tests`).
+126 testes, cobertura de 97% (`docker compose --profile test run --rm tests`).
 
 ## Estrutura
 
@@ -236,8 +267,9 @@ O agente faz uma chamada ao LLM para cada trecho recuperado (grading) antes de r
 src/agro_rag/
   api/            rotas, schemas e dependências do FastAPI
   db/             modelos SQLAlchemy, sessão async e migrações Alembic
-  ingestion/      loader de Markdown, chunking e pipeline de ingestão
+  ingestion/      loader de Markdown, chunking, pipeline, jobs (DynamoDB), fila (SNS) e worker (SQS)
   evaluation/     métricas de ranking e runner com MLflow
+  aws.py          clientes aioboto3 e provisionamento de SNS, SQS e DynamoDB
   cache.py        cache-aside no Redis com degradação graciosa
   resilience.py   retry com backoff e jitter, circuit breaker e transporte HTTP resiliente
   embeddings.py   sentence-transformers e embeddings determinísticos para testes
