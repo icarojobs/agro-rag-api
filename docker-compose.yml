@@ -1,6 +1,7 @@
 x-app-env: &app-env
   AGRO_ENVIRONMENT: docker
   AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
+  AGRO_REDIS_URL: redis://redis:6379/0
   AGRO_OLLAMA_BASE_URL: http://ollama:11434
   AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
   AGRO_OTEL_ENABLED: "true"
@@ -23,6 +24,15 @@ services:
       test: ["CMD-SHELL", "pg_isready -U agro -d agro"]
       interval: 5s
       timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--maxmemory", "128mb", "--maxmemory-policy", "allkeys-lru", "--save", ""]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
       retries: 10
 
   ollama:
@@ -112,6 +122,8 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
       ollama-pull:
         condition: service_completed_successfully
     healthcheck:
@@ -130,8 +142,11 @@ services:
       AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro_test
       AGRO_EMBEDDING_PROVIDER: hashing
       AGRO_LLM_PROVIDER: fake
+      AGRO_REDIS_URL: redis://redis:6379/15
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
 
   locust:
