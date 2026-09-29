@@ -189,6 +189,8 @@ Mesmo cenário do Locust acima (4 workers, 2 min, mesma máquina), com o Redis v
 
 **Queda do Redis sob carga:** com 50 usuários por 60 s, o container do Redis foi parado (`docker compose stop redis`) por cerca de 20 s no meio da execução e religado em seguida. Resultado: 8.019 requisições, 0 falhas; a latência média subiu para 60 ms e o p99 para 690 ms enquanto a API caía para o banco.
 
+**`/ask` com cache de resposta** (Ollama em CPU, mesma pergunta repetida 3 vezes): 19,2 s na primeira chamada (miss) e 2 ms e 50 ms nas seguintes (hit). Amostra de uma pergunta, só para ordem de grandeza.
+
 ### Latência com LLM (Ollama em CPU, `qwen2.5:3b`)
 
 Amostra pequena, apenas para ordem de grandeza: 5 perguntas no `/ask` e 4 no `/agent`, sequenciais.
