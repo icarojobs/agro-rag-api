@@ -2,6 +2,9 @@ x-app-env: &app-env
   AGRO_ENVIRONMENT: docker
   AGRO_DATABASE_URL: postgresql+asyncpg://agro:agro@db:5432/agro
   AGRO_REDIS_URL: redis://redis:6379/0
+  AGRO_AWS_ENDPOINT_URL: http://floci:4566
+  AGRO_AWS_ACCESS_KEY_ID: test
+  AGRO_AWS_SECRET_ACCESS_KEY: test
   AGRO_OLLAMA_BASE_URL: http://ollama:11434
   AGRO_OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen2.5:3b}
   AGRO_OTEL_ENABLED: "true"
@@ -34,6 +37,20 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+
+  # Local AWS emulator (SQS, SNS, DynamoDB). The image has no curl, so the healthcheck
+  # just opens the port.
+  floci:
+    image: floci/floci:2.1.0
+    environment:
+      FLOCI_HOSTNAME: floci
+    ports:
+      - "4566:4566"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/4566"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
 
   ollama:
     image: ollama/ollama:0.19.0
@@ -104,6 +121,17 @@ services:
       db:
         condition: service_healthy
 
+  aws-init:
+    image: agro-rag-api:latest
+    build:
+      context: .
+      target: runtime
+    command: ["agro-rag", "aws-init"]
+    environment: *app-env
+    depends_on:
+      floci:
+        condition: service_healthy
+
   api:
     image: agro-rag-api:latest
     build:
@@ -124,6 +152,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
+      aws-init:
+        condition: service_completed_successfully
       ollama-pull:
         condition: service_completed_successfully
     healthcheck:
@@ -143,8 +173,13 @@ services:
       AGRO_EMBEDDING_PROVIDER: hashing
       AGRO_LLM_PROVIDER: fake
       AGRO_REDIS_URL: redis://redis:6379/15
+      AGRO_AWS_ENDPOINT_URL: http://floci:4566
+      AGRO_AWS_ACCESS_KEY_ID: test
+      AGRO_AWS_SECRET_ACCESS_KEY: test
     depends_on:
       db:
+        condition: service_healthy
+      floci:
         condition: service_healthy
       redis:
         condition: service_healthy

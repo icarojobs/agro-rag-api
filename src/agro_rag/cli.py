@@ -6,6 +6,7 @@ import pandas as pd
 import typer
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from agro_rag.aws import aws_enabled, ensure_infrastructure
 from agro_rag.cache import close_cache
 from agro_rag.config import get_settings
 from agro_rag.db.session import create_engine
@@ -65,6 +66,18 @@ def ingest(
         f"documents={stats.documents} created={stats.created} updated={stats.updated} "
         f"skipped={stats.skipped} removed={stats.removed} chunks={stats.chunks}"
     )
+
+
+@app.command("aws-init")
+def aws_init() -> None:
+    """Create the SNS topic, SQS queues (with DLQ) and DynamoDB table used by ingestion."""
+    settings = get_settings()
+    if not aws_enabled(settings):
+        typer.echo("AGRO_AWS_ENDPOINT_URL is not set", err=True)
+        raise typer.Exit(1)
+    infra = asyncio.run(ensure_infrastructure(settings))
+    typer.echo(f"topic={infra.topic_arn} queue={infra.queue_url} dlq={infra.dlq_url}")
+    typer.echo(f"audit={infra.audit_queue_url} table={infra.table}")
 
 
 def _int_list(value: str) -> list[int]:
