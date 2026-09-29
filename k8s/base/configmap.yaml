@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: agro-rag-config
+data:
+  AGRO_ENVIRONMENT: kubernetes
+  AGRO_REDIS_URL: redis://redis:6379/0
+  AGRO_OLLAMA_BASE_URL: http://ollama:11434
+  AGRO_OLLAMA_MODEL: qwen2.5:3b
+  AGRO_AWS_ENDPOINT_URL: http://floci:4566
+  AGRO_OTEL_ENABLED: "false"
+  OMP_NUM_THREADS: "2"
+  WEB_CONCURRENCY: "2"

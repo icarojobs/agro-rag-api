@@ -1,0 +1,50 @@
+# Local AWS emulator standing in for SNS, SQS and DynamoDB. On real AWS, drop this file
+# and remove AGRO_AWS_ENDPOINT_URL (use IAM roles instead of the static keys).
+apiVersion: v1
+kind: Service
+metadata:
+  name: floci
+spec:
+  selector:
+    app: floci
+  ports:
+    - name: aws
+      port: 4566
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: floci
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: floci
+  template:
+    metadata:
+      labels:
+        app: floci
+    spec:
+      # Service env vars such as FLOCI_PORT=tcp://... would collide with app settings.
+      enableServiceLinks: false
+      containers:
+        - name: floci
+          image: floci/floci:2.1.0
+          env:
+            - name: FLOCI_HOSTNAME
+              value: floci
+          ports:
+            - name: aws
+              containerPort: 4566
+          readinessProbe:
+            tcpSocket:
+              port: aws
+            periodSeconds: 3
+          livenessProbe:
+            tcpSocket:
+              port: aws
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests: { cpu: 50m, memory: 128Mi }
+            limits: { memory: 512Mi }

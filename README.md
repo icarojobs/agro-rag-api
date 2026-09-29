@@ -153,6 +153,36 @@ curl -s localhost:8000/ingest/jobs/6b01c3...    # queued -> processing -> done |
 - **Falhas da AWS:** se o SNS ou o DynamoDB estiverem fora do ar, o `POST` responde `503` com `Retry-After` e o registro do job é removido; a API continua servindo as demais rotas. Sem `AGRO_AWS_ENDPOINT_URL` a ingestão assíncrona fica desligada (503).
 - **Testes:** os testes de integração rodam contra o floci no compose e na CI (provisionamento, fan-out, redrive, idempotência, retry, DLQ e o loop real do worker).
 
+## Kubernetes
+
+Manifestos em `k8s/` (kustomize): `base/` tem namespace, ConfigMap, Secret (credenciais de desenvolvimento), Postgres com pgvector (StatefulSet com PVC), Redis, floci, os Jobs `migrate` e `aws-init`, o Deployment `api` (2 réplicas, Service, probes e HPA) e o Deployment `worker`. O overlay `overlays/kind` troca os embeddings por `hashing` e o LLM por `fake`, para o cluster local não precisar baixar modelos nem rodar o Ollama (o Ollama não está nos manifestos).
+
+- **Probes da API:** `startupProbe` e `livenessProbe` em `/livez` (só o processo), `readinessProbe` em `/readyz` (falha só se o banco cair).
+- **HPA:** `autoscaling/v2`, CPU a 70% do request (250m), de 2 a 6 réplicas.
+- Os pods usam `enableServiceLinks: false`: sem isso o Kubernetes injeta `FLOCI_PORT=tcp://...`, que o floci tenta ler como número de porta e não sobe (`CrashLoopBackOff`).
+
+Como validar localmente (kind v0.34.0 e kubectl v1.37.1, cluster Kubernetes v1.37.0):
+
+```bash
+kind create cluster --name agro-rag
+docker compose build api
+for i in agro-rag-api:latest pgvector/pgvector:pg17 redis:7.4-alpine floci/floci:2.1.0; do
+  kind load docker-image $i --name agro-rag
+done
+kubectl apply -k k8s/overlays/kind
+kubectl -n agro-rag wait --for=condition=complete job/migrate job/aws-init --timeout=300s
+kubectl -n agro-rag rollout status deploy/api deploy/worker deploy/floci deploy/redis
+kubectl -n agro-rag exec deploy/api -- agro-rag ingest
+kubectl -n agro-rag port-forward svc/api 18000:80
+curl -s localhost:18000/readyz
+```
+
+O que foi verificado nesse cluster: os Jobs `migrate` e `aws-init` completaram; os Deployments `api` (2/2), `worker`, `floci` e `redis` e o StatefulSet `postgres` (PVC de 2 Gi `Bound`) ficaram `Ready`; `/livez` e `/readyz` responderam 200 (`{"status":"ready","database":"ok","cache":"ok","llm":"fake"}`); `/search` e `/ask` responderam via Service; um `POST /ingest/documents` foi consumido pelo worker no cluster e o job terminou `done`; a chave de cache apareceu no Redis do cluster.
+
+**HPA:** o kind não traz metrics-server, então ele foi instalado à parte (manifesto oficial com `--kubelet-insecure-tls`). Com as métricas disponíveis o HPA passou a mostrar `cpu: 1%/70%`. Para forçar o escalonamento, o cache foi desligado (`kubectl -n agro-rag set env deploy/api AGRO_REDIS_URL=`) e o Locust (imagem `dev`) rodou dentro do cluster com 150 usuários por 4 min: a CPU chegou a 334% do request e o HPA subiu a `api` de 2 para 6 réplicas (evento `SuccessfulRescale`), todas `Ready`. Foram 116.642 requisições, 0 falhas, 486,6 req/s e p95 de 9 ms, mas esse throughput vem de um cluster de um único nó com o gerador de carga na mesma máquina e embeddings `hashing`; serve para mostrar o escalonamento, não como benchmark.
+
+**Não validado:** cluster multi-nó, PVC em storage class de nuvem, Ollama e embeddings reais dentro do cluster, Ingress, escalonamento para baixo do HPA, e o uso de credenciais reais da AWS no lugar do floci.
+
 ## Corpus e avaliação
 
 - `corpus/`: 36 documentos curtos, escritos para este projeto, em quatro categorias (`solo`, `culturas`, `fitossanidade`, `manejo`).

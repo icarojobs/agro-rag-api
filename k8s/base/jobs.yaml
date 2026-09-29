@@ -1,0 +1,44 @@
+# One-shot setup Jobs. They retry until Postgres and floci accept connections.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+spec:
+  backoffLimit: 30
+  template:
+    spec:
+      # Service env vars such as FLOCI_PORT=tcp://... would collide with app settings.
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: agro-rag-api:latest
+          imagePullPolicy: IfNotPresent
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: agro-rag-config
+            - secretRef:
+                name: agro-rag-secrets
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: aws-init
+spec:
+  backoffLimit: 30
+  template:
+    spec:
+      # Service env vars such as FLOCI_PORT=tcp://... would collide with app settings.
+      enableServiceLinks: false
+      restartPolicy: OnFailure
+      containers:
+        - name: aws-init
+          image: agro-rag-api:latest
+          imagePullPolicy: IfNotPresent
+          command: ["agro-rag", "aws-init"]
+          envFrom:
+            - configMapRef:
+                name: agro-rag-config
+            - secretRef:
+                name: agro-rag-secrets
