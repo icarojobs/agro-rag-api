@@ -1,4 +1,5 @@
 import os
+import uuid
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agro_rag.aws import Infra, ensure_infrastructure
 from agro_rag.cache import get_cache
 from agro_rag.config import get_settings
 from agro_rag.db.session import get_engine, get_sessionmaker
@@ -61,6 +63,27 @@ async def client() -> AsyncIterator[AsyncClient]:
     app = create_app()
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+async def isolated(monkeypatch: pytest.MonkeyPatch) -> Infra:
+    """Fresh topic, queues and table per test, so tests never see each other's messages."""
+    suffix = uuid.uuid4().hex[:8]
+    for env, name in {
+        "TOPIC": "topic",
+        "QUEUE": "jobs",
+        "DLQ": "dlq",
+        "AUDIT_QUEUE": "audit",
+        "TABLE": "table",
+    }.items():
+        monkeypatch.setenv(f"AGRO_INGESTION_{env}", f"t-{name}-{suffix}")
+    # Short timers so redelivery and the DLQ hand-off happen within a test.
+    monkeypatch.setenv("AGRO_INGESTION_VISIBILITY_TIMEOUT_SECONDS", "2")
+    monkeypatch.setenv("AGRO_INGESTION_MAX_RECEIVE_COUNT", "2")
+    monkeypatch.setenv("AGRO_INGESTION_POLL_WAIT_SECONDS", "1")
+    get_settings.cache_clear()
+    get_ingestion_queue.cache_clear()
+    return await ensure_infrastructure(get_settings())
 
 
 @pytest.fixture

@@ -1,4 +1,5 @@
 import asyncio
+import signal
 from pathlib import Path
 from typing import Annotated
 
@@ -19,6 +20,7 @@ from agro_rag.evaluation.runner import (
     log_to_mlflow,
 )
 from agro_rag.ingestion.pipeline import IngestionStats, ingest_corpus
+from agro_rag.ingestion.worker import run_worker
 
 app = typer.Typer(help="agro-rag command line tools", no_args_is_help=True)
 
@@ -78,6 +80,34 @@ def aws_init() -> None:
     infra = asyncio.run(ensure_infrastructure(settings))
     typer.echo(f"topic={infra.topic_arn} queue={infra.queue_url} dlq={infra.dlq_url}")
     typer.echo(f"audit={infra.audit_queue_url} table={infra.table}")
+
+
+async def _worker() -> None:
+    settings = get_settings()
+    stop = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop.set)
+    engine = create_engine()
+    try:
+        await run_worker(
+            settings,
+            stop,
+            sessionmaker=async_sessionmaker(engine, expire_on_commit=False),
+            embeddings=get_embeddings(),
+        )
+    finally:
+        await engine.dispose()
+        await close_cache()
+
+
+@app.command()
+def worker() -> None:
+    """Consume ingestion jobs from SQS until SIGTERM."""
+    if not aws_enabled(get_settings()):
+        typer.echo("AGRO_AWS_ENDPOINT_URL is not set", err=True)
+        raise typer.Exit(1)
+    asyncio.run(_worker())
 
 
 def _int_list(value: str) -> list[int]:

@@ -44,6 +44,8 @@ class Settings(BaseSettings):
     ingestion_table: str = "agro-ingestion-jobs"
     ingestion_visibility_timeout_seconds: int = 60
     ingestion_max_receive_count: int = 3
+    ingestion_poll_wait_seconds: int = 10
+    ingestion_batch_size: int = 5
 
     embedding_provider: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
     embedding_model: str = "intfloat/multilingual-e5-small"

@@ -162,6 +162,25 @@ services:
       timeout: 5s
       retries: 5
 
+  worker:
+    image: agro-rag-api:latest
+    build:
+      context: .
+      target: runtime
+    command: ["agro-rag", "worker"]
+    environment:
+      <<: *app-env
+      OMP_NUM_THREADS: ${API_TORCH_THREADS:-2}
+    volumes:
+      - hf-cache:/models
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      aws-init:
+        condition: service_completed_successfully
+
   tests:
     image: agro-rag-api:dev
     build:
