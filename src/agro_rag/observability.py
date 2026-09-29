@@ -33,6 +33,12 @@ GENERATION_SECONDS = Histogram(
 )
 TOOL_CALLS = Counter("agro_rag_tool_calls_total", "Tool calls executed by the agent", ["tool"])
 
+CACHE_REQUESTS = Counter(
+    "agro_rag_cache_requests_total",
+    "Redis cache lookups by cache name and outcome (hit, miss or error)",
+    ["cache", "result"],
+)
+
 tracer = trace.get_tracer("agro_rag")
 
 

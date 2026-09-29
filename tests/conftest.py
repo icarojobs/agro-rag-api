@@ -15,6 +15,7 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agro_rag.cache import get_cache
 from agro_rag.config import get_settings
 from agro_rag.db.session import get_engine, get_sessionmaker
 from agro_rag.embeddings import get_embeddings
@@ -34,6 +35,7 @@ def migrated_database() -> Iterator[None]:
 def reset_cached_settings() -> Iterator[None]:
     yield
     get_settings.cache_clear()
+    get_cache.cache_clear()
     get_embeddings.cache_clear()
     get_llm.cache_clear()
 

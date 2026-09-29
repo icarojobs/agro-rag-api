@@ -8,6 +8,7 @@ from langchain_core.embeddings import Embeddings
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from agro_rag.cache import invalidate_collection
 from agro_rag.db.models import Chunk, Document
 from agro_rag.ingestion.chunking import chunk_document
 from agro_rag.ingestion.loader import SourceDocument, load_corpus
@@ -88,6 +89,8 @@ async def ingest_documents(
 
     await session.commit()
     logger.info("ingestion_finished", collection=collection, **asdict(stats))
+    if stats.created or stats.updated or stats.removed:
+        await invalidate_collection(collection)
     return stats
 
 

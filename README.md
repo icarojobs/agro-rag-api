@@ -8,6 +8,7 @@ Tudo roda localmente com `docker compose up`, sem chave de API externa.
 
 - **API:** Python 3.12, FastAPI, Pydantic v2, uv
 - **Banco vetorial:** PostgreSQL 17 + pgvector (índice HNSW, distância de cosseno), SQLAlchemy 2 async + asyncpg, Alembic
+- **Cache:** Redis 7 (cache-aside com TTL, degradação graciosa), redis-py asyncio
 - **Embeddings:** `intfloat/multilingual-e5-small` via sentence-transformers (CPU)
 - **LLM / orquestração:** LangChain (LCEL, retriever próprio), LangGraph (agente com grading e ferramenta), Ollama com `qwen2.5:3b`
 - **Avaliação:** recall@k, MRR e nDCG com numpy, pandas e scikit-learn; experimentos registrados no MLflow
@@ -29,6 +30,7 @@ flowchart LR
     C -->|POST /ask| API
     C -->|POST /agent| API
     API --> RET[PgVectorRetriever]
+    RET -.cache-aside.-> RD[(Redis)]
     RET --> PG
     API --> RAG[Cadeia RAG<br/>LCEL]
     API --> AG[Agente LangGraph]
@@ -57,7 +59,7 @@ flowchart LR
 Pré-requisitos: Docker e Docker Compose.
 
 ```bash
-docker compose up -d --wait                 # db, migrate, ollama (+ pull do modelo), api, mlflow, jaeger, prometheus
+docker compose up -d --wait                 # db, redis, migrate, ollama (+ pull do modelo), api, mlflow, jaeger, prometheus
 docker compose run --rm api agro-rag ingest # indexa os 36 documentos do corpus
 ```
 
@@ -91,6 +93,21 @@ curl -s localhost:8000/agent -H 'content-type: application/json' \
 ```
 
 Também existem `GET /health` (verifica o banco) e `GET /metrics` (Prometheus).
+
+## Cache (Redis)
+
+O `/search`, o `/ask` e o retriever do `/agent` usam cache-aside no Redis:
+
+| Cache | Chave | TTL padrão |
+|---|---|---|
+| `search` | coleção, categoria, `k` e pergunta | 300 s (`AGRO_CACHE_TTL_SECONDS`) |
+| `embedding` | modelo e pergunta (vetor da consulta) | 3600 s (`AGRO_CACHE_EMBEDDING_TTL_SECONDS`) |
+| `answer` | modelo, coleção, `k` e pergunta (resposta do `/ask`) | 300 s |
+
+- O cache é opcional: sem `AGRO_REDIS_URL` a API roda sem Redis. O compose já configura `redis://redis:6379/0`, com `maxmemory 128mb` e política `allkeys-lru`.
+- **Degradação graciosa:** qualquer falha do Redis (recusa de conexão, timeout de `AGRO_REDIS_TIMEOUT_SECONDS` = 0,25 s, valor corrompido) é tratada como cache miss, registrada em log e contada; a requisição segue para o banco e nunca vira 5xx.
+- **Invalidação:** a ingestão que cria, atualiza ou remove documentos apaga (via `SCAN`) as chaves `search` e `answer` da coleção.
+- **Métricas:** `agro_rag_cache_requests_total{cache,result}` com `result` em `hit`, `miss` ou `error`.
 
 ## Corpus e avaliação
 
@@ -159,6 +176,21 @@ LOCUST_USERS=100 LOCUST_SPAWN_RATE=20 docker compose --profile load run --rm loc
 
 Com 100 usuários a API já está saturada (~100 req/s): o throughput não sobe e a latência cresce por fila. O gargalo é o encoding da pergunta na CPU. Antes de habilitar múltiplos workers, com um único processo, o mesmo teste de 50 usuários ficava em 41,62 req/s com mediana de 860 ms.
 
+### Efeito do cache Redis no `/search`
+
+Mesmo cenário do Locust acima (4 workers, 2 min, mesma máquina), com o Redis vazio no início de cada execução. O cenário sorteia entre as 72 perguntas de `eval/questions.jsonl`, então o cache aquece em poucos segundos: a taxa de acerto foi de 99,2% (19.240 hits e 148 misses no `search`). É um teto favorável, não a taxa esperada em produção. A partir de certo ponto o throughput passa a ser limitado pelo próprio Locust (espera de 0,1 a 0,5 s por usuário), não pela API.
+
+| Usuários | Cache | Requisições | Falhas | Throughput | p50 | p95 | p99 |
+|---:|---|---:|---:|---:|---:|---:|---:|
+| 50 | sem | 13.683 | 0 | 114,28 req/s | 90 ms | 360 ms | 550 ms |
+| 50 | com | 19.385 | 0 | 161,93 req/s | 2 ms | 4 ms | 13 ms |
+| 100 | sem | 13.313 | 0 | 111,17 req/s | 580 ms | 900 ms | 1.100 ms |
+| 100 | com | 38.864 | 0 | 324,53 req/s | 2 ms | 5 ms | 22 ms |
+
+**Queda do Redis sob carga:** com 50 usuários por 60 s, o container do Redis foi parado (`docker compose stop redis`) por cerca de 20 s no meio da execução e religado em seguida. Resultado: 8.019 requisições, 0 falhas; a latência média subiu para 60 ms e o p99 para 690 ms enquanto a API caía para o banco.
+
+**`/ask` com cache de resposta** (Ollama em CPU, mesma pergunta repetida 3 vezes): 19,2 s na primeira chamada (miss) e 2 ms e 50 ms nas seguintes (hit). Amostra de uma pergunta, só para ordem de grandeza.
+
 ### Latência com LLM (Ollama em CPU, `qwen2.5:3b`)
 
 Amostra pequena, apenas para ordem de grandeza: 5 perguntas no `/ask` e 4 no `/agent`, sequenciais.
@@ -172,7 +204,7 @@ O agente faz uma chamada ao LLM para cada trecho recuperado (grading) antes de r
 
 ### Testes
 
-51 testes, cobertura de 98% (`docker compose --profile test run --rm tests`).
+68 testes, cobertura de 98% (`docker compose --profile test run --rm tests`).
 
 ## Estrutura
 
@@ -182,6 +214,7 @@ src/agro_rag/
   db/             modelos SQLAlchemy, sessão async e migrações Alembic
   ingestion/      loader de Markdown, chunking e pipeline de ingestão
   evaluation/     métricas de ranking e runner com MLflow
+  cache.py        cache-aside no Redis com degradação graciosa
   embeddings.py   sentence-transformers e embeddings determinísticos para testes
   retrieval.py    busca no pgvector e retriever do LangChain
   rag.py          cadeia RAG (LCEL)

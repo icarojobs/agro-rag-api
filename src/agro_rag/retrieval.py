@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from langchain_core.callbacks import (
     AsyncCallbackManagerForRetrieverRun,
@@ -11,6 +11,8 @@ from langchain_core.retrievers import BaseRetriever
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from agro_rag.cache import RedisCache, make_key
+from agro_rag.config import get_settings
 from agro_rag.db.models import Chunk, Document
 from agro_rag.observability import RETRIEVAL_SECONDS, tracer
 
@@ -66,6 +68,22 @@ async def search_by_vector(
     ]
 
 
+async def embed_query(
+    embeddings: Embeddings, query: str, cache: RedisCache | None = None
+) -> list[float]:
+    """Encode the query on a worker thread, reusing a cached vector when there is one."""
+    if cache is None:
+        return await asyncio.to_thread(embeddings.embed_query, query)
+    model = getattr(embeddings, "model_name", type(embeddings).__name__)
+    key = make_key("embedding", model, query)
+    cached = await cache.get("embedding", key)
+    if cached is not None:
+        return list(cached)
+    vector = await asyncio.to_thread(embeddings.embed_query, query)
+    await cache.set("embedding", key, vector, get_settings().cache_embedding_ttl_seconds)
+    return vector
+
+
 async def search(
     session: AsyncSession,
     embeddings: Embeddings,
@@ -74,6 +92,33 @@ async def search(
     k: int,
     collection: str,
     category: str | None = None,
+    cache: RedisCache | None = None,
+) -> list[RetrievedChunk]:
+    """Semantic search, cache-aside: results and query vectors are cached in Redis if given."""
+    key = make_key("search", collection, category, k, query, scope=collection)
+    if cache is not None:
+        cached = await cache.get("search", key)
+        if cached is not None:
+            return [RetrievedChunk(**item) for item in cached]
+    results = await _search_uncached(
+        session, embeddings, query, k=k, collection=collection, category=category, cache=cache
+    )
+    if cache is not None:
+        await cache.set(
+            "search", key, [asdict(r) for r in results], get_settings().cache_ttl_seconds
+        )
+    return results
+
+
+async def _search_uncached(
+    session: AsyncSession,
+    embeddings: Embeddings,
+    query: str,
+    *,
+    k: int,
+    collection: str,
+    category: str | None,
+    cache: RedisCache | None,
 ) -> list[RetrievedChunk]:
     with (
         RETRIEVAL_SECONDS.time(),
@@ -82,7 +127,7 @@ async def search(
         span.set_attribute("retrieval.k", k)
         span.set_attribute("retrieval.collection", collection)
         with tracer.start_as_current_span("retrieval.embed_query"):
-            vector = await asyncio.to_thread(embeddings.embed_query, query)
+            vector = await embed_query(embeddings, query, cache)
         results = await search_by_vector(
             session, vector, k=k, collection=collection, category=category
         )
@@ -99,13 +144,19 @@ class PgVectorRetriever(BaseRetriever):
     embeddings: Embeddings
     collection: str
     k: int = 4
+    cache: RedisCache | None = None
 
     async def _aget_relevant_documents(
         self, query: str, *, run_manager: AsyncCallbackManagerForRetrieverRun
     ) -> list[LCDocument]:
         async with self.sessionmaker() as session:
             chunks = await search(
-                session, self.embeddings, query, k=self.k, collection=self.collection
+                session,
+                self.embeddings,
+                query,
+                k=self.k,
+                collection=self.collection,
+                cache=self.cache,
             )
         return [c.to_langchain() for c in chunks]
 

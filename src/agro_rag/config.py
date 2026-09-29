@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     db_pool_size: int = 10
     db_max_overflow: int = 10
 
+    # Cache is optional: leave unset to run without Redis.
+    redis_url: str | None = None
+    redis_timeout_seconds: float = 0.25
+    cache_ttl_seconds: int = 300
+    cache_embedding_ttl_seconds: int = 3600
+
     embedding_provider: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
     embedding_model: str = "intfloat/multilingual-e5-small"
 

@@ -6,6 +6,7 @@ import pandas as pd
 import typer
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
+from agro_rag.cache import close_cache
 from agro_rag.config import get_settings
 from agro_rag.db.session import create_engine
 from agro_rag.embeddings import get_embeddings
@@ -40,6 +41,7 @@ async def _ingest(corpus: Path, collection: str, chunk_size: int, overlap: int) 
             )
     finally:
         await engine.dispose()
+        await close_cache()
 
 
 @app.command()
