@@ -30,6 +30,21 @@ class Settings(BaseSettings):
     cache_ttl_seconds: int = 300
     cache_embedding_ttl_seconds: int = 3600
 
+    # AWS messaging. `aws_endpoint_url` points at the local emulator (floci); leave it unset
+    # to use the real AWS credential chain. Ingestion via SQS is disabled without a URL or
+    # `aws_enabled`.
+    aws_endpoint_url: str | None = None
+    aws_region: str = "us-east-1"
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
+    ingestion_topic: str = "agro-ingestion"
+    ingestion_queue: str = "agro-ingestion-jobs"
+    ingestion_dlq: str = "agro-ingestion-dlq"
+    ingestion_audit_queue: str = "agro-ingestion-audit"
+    ingestion_table: str = "agro-ingestion-jobs"
+    ingestion_visibility_timeout_seconds: int = 60
+    ingestion_max_receive_count: int = 3
+
     embedding_provider: Literal["sentence-transformers", "hashing"] = "sentence-transformers"
     embedding_model: str = "intfloat/multilingual-e5-small"
 

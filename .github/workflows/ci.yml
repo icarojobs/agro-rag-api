@@ -47,8 +47,20 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
+      floci:
+        image: floci/floci:2.1.0
+        ports:
+          - 4566:4566
+        options: >-
+          --health-cmd "bash -c 'exec 3<>/dev/tcp/127.0.0.1/4566'"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
     env:
       AGRO_REDIS_URL: redis://localhost:6379/15
+      AGRO_AWS_ENDPOINT_URL: http://localhost:4566
+      AGRO_AWS_ACCESS_KEY_ID: test
+      AGRO_AWS_SECRET_ACCESS_KEY: test
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
